@@ -6,7 +6,6 @@ They can but don't need to have trainable parameters.
 import numpy as np
 import pennylane as qml
 from pennylane.operation import Operation
-from pennylane import numpy as qnp
 
 
 def epr_state(features, qubit_ids):
