@@ -30,25 +30,46 @@ class Colors(str, Enum):
 
 
 class Trainer(ABC):
-    def __init__(self, k_folds: int = 1):
+    def __init__(self, 
+                 init_params: np.ndarray,
+                 train_size: int = 1,
+                 validation_size: int = 1,
+                 k_folds: int = 1,
+                 epochs: int = 1,
+                 batch_size: int = 1,
+                 callbacks: List = [],
+                 eval_interval: int = 1,
+                 save_dir: str = '',
+                 disable_bar = False
+                 ):
+        
         # TODO: Do all of those need to be attributes?
+        self.init_params = init_params
+        self.train_size = train_size
+        self.validation_size = validation_size
         self.k_folds = k_folds
-        self.train_size = 0
-        self.epochs = 0
-        self.batch_size = 0
-        self.init_params: dict = {}
-        self.save_dir = ''
-        self.callbacks: List = []
-        self.disable_bar = False
-        self.val_loss_histories = np.empty(0)
-        self.train_loss_hist = np.empty(0)
-        self.k_loss_intervals = np.empty(0)
-        self.train_loss_intervals = np.empty(0)
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.callbacks =  callbacks
+        self.save_dir = save_dir
+        self.eval_interval = eval_interval
+        self.disable_bar = disable_bar
+        self.val_loss_histories = np.full(
+            (self.k_folds, int((self.epochs / self.eval_interval) + 1)), np.inf
+        )
+        self.k_loss_intervals = np.tile(
+            np.arange(0, self.epochs + 1, self.eval_interval), (self.k_folds, 1)
+        )
+        self.train_loss_hist = np.zeros((self.k_folds, self.epochs + 1))
+        self.train_loss_intervals = np.tile(
+            np.arange(0, self.epochs + 1, 1), (self.k_folds, 1)
+        )
         self.best_params = self.init_params
-        self.eval_interval = 0
         self.info: dict = {}
         self.best_performance_log = tqdm()
         self.current_fold = 0
+
+        self._use_jax = False
 
     def save_params(self, params: Union[dict, np.ndarray], save_dir: str) -> None:
         with open(f"{str(save_dir)}/params.pkl", "wb") as f:
@@ -110,36 +131,23 @@ class Trainer(ABC):
 
     def train(
         self,
-        train_data: Dataset,
-        train_size: int,
-        validation_size: int,
+        train_data: Union[Dataset,jdl.Dataset],
         model_fn: object,
         loss_fn: object,
         optimiser_fn: object,
-        epochs: int,
-        batch_size: int,
-        init_params: dict,
-        eval_interval: int,
-        save_dir: str,
         circuit_properties: Optional[dict] = None,
-        callbacks: List = [],
-        disable_bar: bool = False,
-        prune=False,
         use_ray=False,
-        use_jax = False,
     ) -> Tuple[qnp.ndarray, np.ndarray, dict]:  # pylint: disable=no-member
         """function needs to be simplified
 
         Args:
             train_data (Dataset): _description_
-            train_size (int): _description_
             validation_size (int): _description_
             model_fn (object): _description_
             loss_fn (object): _description_
             optimiser_fn (object): _description_
             epochs (int): _description_
             batch_size (int): _description_
-            init_params (dict): _description_
             eval_interval (int): _description_
             save_dir (str): _description_
             circuit_properties (dict, optional): _description_. Defaults to None.
@@ -151,33 +159,10 @@ class Trainer(ABC):
             Tuple[qnp.ndarray, np.ndarray, dict]: _description_
         """
 
-        self.train_size = train_size
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.init_params = init_params
-        self.save_dir = save_dir
-        self.callbacks = callbacks
-        self.disable_bar = disable_bar
-        self.val_loss_histories = np.full(
-            (self.k_folds, int((self.epochs / eval_interval) + 1)), np.inf
-        )
-
-        self.train_loss_hist = np.zeros((self.k_folds, self.epochs + 1))
-        self.k_loss_intervals = np.tile(
-            np.arange(0, self.epochs + 1, eval_interval), (self.k_folds, 1)
-        )
-        self.train_loss_intervals = np.tile(
-            np.arange(0, self.epochs + 1, 1), (self.k_folds, 1)
-        )
-
-        self.best_params = self.init_params
-        self.eval_interval = eval_interval
-        self.info = {}
-
-        self.save_setup(save_dir)
+        self.save_setup(self.save_dir)
 
         if self.callbacks:
-            self.setup_callbacks(circuit_properties, eval_interval)
+            self.setup_callbacks(circuit_properties, self.eval_interval)
 
         # setup performance log
         print(Colors.GREEN + "BEGINNING TRAINING" + Colors.RESET)
@@ -200,8 +185,8 @@ class Trainer(ABC):
         for i in range(self.k_folds):
             self.current_fold = i
             train_ids, val_ids = train_data.split(
-                self.train_size, validation_size)
-            if use_jax:
+                self.train_size, self.validation_size)
+            if self._use_jax:
                 train_loader = jdl.DataLoader(train_data,
                                               backend='jax',
                                               batch_size=int(self.batch_size),
@@ -223,30 +208,15 @@ class Trainer(ABC):
                 loss_fn,
                 optimiser_fn,
                 circuit_properties,
-                prune,
                 use_ray,
             )
             fold_bar.update(1)
         fold_bar.close()
 
         print(Colors.RED + "TRAINING ENDING" + Colors.RESET)
-        # NOTE: COMMENTED THESE OUT BC ERRORS WHEN USING RAY
-        # self.plot_loss(
-        #    self.val_loss_histories,
-        #    self.k_loss_intervals,
-        #    f"{save_dir}/val_loss_plot.pdf",
-        # )
-        # self.plot_loss(
-        #    self.train_loss_hist,
-        #    self.train_loss_intervals,
-        #    f"{save_dir}/train_loss_plot.pdf",
-        # )
 
-        # if self.callbacks:
-        #    self.plot_info(f"{save_dir}/info")
-
-        self.save_losses_and_info(save_dir)
-        self.save_model(model_fn, loss_fn, circuit_properties, save_dir)
+        self.save_losses_and_info(self.save_dir)
+        self.save_model(model_fn, loss_fn, circuit_properties, self.save_dir)
 
         return (
             self.best_params,
@@ -255,31 +225,18 @@ class Trainer(ABC):
         )
 
     @abstractmethod
-    def train_loop(self, model_fn, train_loader, val_data, loss_fn, optimiser_fn, circuit_properties, prune, use_ray):
+    def train_loop(self, model_fn, train_loader, val_data, loss_fn, optimiser_fn, circuit_properties, use_ray):
         pass
 
-    # maybe add method for validation loss metrics e.g. auc scores and curves?
-    # def plot_loss(self, loss_array, intervals, filename):
-    #    for i in range(self.k_folds):
-    #        plt.plot(intervals[i, :], loss_array[i, :], label=f"fold: {i}")
-    #
-    #    plt.legend()
-    #    plt.savefig(filename)
-    #    plt.close()
-
-    def plot_info(self, filename):
-        for _, call in enumerate(self.callbacks):
-            for i in range(self.k_folds):
-                y = self.info[str(call)][i, :, :]
-                x = self.k_loss_intervals[i, :]
-                plt.plot(x, y, label=f"fold: {i}")
-            plt.legend()
-            plt.title(f"{str(call)}")
-            plt.savefig(f"{filename}_{str(call)}.pdf")
-            plt.close()
 
 
-class QuantumTrainer(Trainer):
+class TorchQMLTrainer(Trainer):
+    """
+    Trainer which assumes pytorch pipleline and data as qnp.arrays
+    NOTE: ongoing is organising this module such that I understand it and it makes sense to me
+    inherited from Callum/Mohammad and there were stuff I didn't understand about it
+    """
+
     def classical_update(
         self,
         loss_fn: object,
@@ -318,7 +275,7 @@ class QuantumTrainer(Trainer):
             model_fn,
             circuit_properties,
         )
-
+        #NOTE: not sure what this is used for
         def metric_fn(p):
             tensor = qml.metric_tensor(model_fn, approx="block-diag")
             return tensor(p, metric_sample_batch, circuit_properties,)  # pylint: disable=not-callable
@@ -377,7 +334,6 @@ class QuantumTrainer(Trainer):
         loss_fn: Callable,
         optimiser_fn: Callable,
         circuit_properties: dict,
-        prune: bool,
         use_ray: bool
     ) -> qnp.ndarray:  # pylint: disable=no-member
         outer = tqdm(
@@ -397,6 +353,7 @@ class QuantumTrainer(Trainer):
         )
 
         if isinstance(optimiser_fn, qml.QNGOptimizer):
+            #pylance suggests this is unreachable but that's probably not true and a case of bad typing
             update_fn = self.quantum_update
         else:
             update_fn = self.classical_update
@@ -452,19 +409,60 @@ class QuantumTrainer(Trainer):
 
 
 class JaxTrainer(Trainer):
-    #TODO: INTEGRATE ABSTRACT CLASS BETTER, MOSTLY TYPES TO NOT DEFAULT TO torch
+    """
+    Trainer which uses Jax pipeline. 
+    NOTE: ongoing is organising this module such that I understand it and it makes sense to me
+    inherited from Callum/Mohammad and there were stuff I didn't understand about it
     #TODO: if i want to jit, I need to understand what to do with arguments, otherwise error thrown
+    """
     #@jax.jit
+
+    def __init__(self, 
+                 init_params: np.ndarray,
+                 train_size: int = 1,
+                 validation_size: int = 1,
+                 k_folds: int = 1,
+                 epochs: int = 1,
+                 batch_size: int = 1,
+                 callbacks: List = [],
+                 eval_interval: int = 1,
+                 save_dir: str = '',
+                 disable_bar = False):
+
+        super().__init__(init_params,
+                         train_size,
+                         validation_size,
+                         k_folds,
+                         epochs,
+                         batch_size,
+                         callbacks,
+                         eval_interval,
+                         save_dir,
+                         disable_bar)
+        self._use_jax = True
+
+    def classical_update(
+        self,
+        loss_fn,
+        params,
+        model_fn,
+        sample_batch,
+        optimiser_fn,
+        circuit_properties
+    ):
+        """
+        TODO: develop this when needing to compare to classical models - will this be much different to quantum update? prolly not
+        """
+        pass
     def quantum_update(self,
-        loss_fn,#: object,
+        loss_fn: object,
         opt_state,#: Callable,
         model_fn,#: object,
         sample_batch,#: Sequence,
         optimiser_fn,#: Sequence,
-        circuit_properties,#: dict,
-        step_id,#:int,
+        circuit_properties: dict,
+        step_id:int,
         ):
-        print('got here0')
 
         #vec_model_fn = jax.vmap(model_fn)
         #@jax.jit
@@ -477,14 +475,51 @@ class JaxTrainer(Trainer):
         )
         
         opt_init, opt_update, get_params = optimiser_fn
-        print('gothere1')
         net_params = get_params(opt_state)
-        print('got here2')
         loss, grads = jax.value_and_grad(cost_fn)(net_params)
         return opt_update(step_id, grads, opt_state), loss
     
-    def train_loop(
+    def update_logs(
+            self, i: int, params: qnp.ndarray, loss: float, performance_log: tqdm  # pylint: disable=no-member
+    ):
+        """
+        NOTE: this just copied from TorchQMLTrainer
+        """
+        performance_log.set_description_str(f"step: {i}, loss: {loss}")
+
+        if (i == 0) & (self.current_fold == 0):
+            self.best_performance_log.set_description_str(
+                f"Best Model saved at step: {i}, loss: {loss}"
+            )
+            self.save_params(params, self.save_dir)
+            self.best_params = params
+        if (i > 0) & (np.all(loss < self.val_loss_histories)):
+            self.best_performance_log.set_description_str(
+                f"Best Model saved at step: {i}, loss: {loss}"
+            )
+            self.save_params(params, self.save_dir)
+            self.best_params = params
+
+        return
+
+    def validate(
+        self,
+        model: object,
+        loss_fn: Callable,
+        params: qnp.ndarray,  # pylint: disable=no-member
+        val_data: np.ndarray,
+        circuit_properties: dict,
+    ) -> float:
         
+        """
+        Same as TorchQMLTrainer but data not passed as qnp.array
+        """
+        
+        loss = loss_fn(params, val_data[:][0], model, circuit_properties)
+
+        return loss
+
+    def train_loop(
         self,
         model_fn: Callable,
         train_loader: DataLoader,
@@ -492,7 +527,6 @@ class JaxTrainer(Trainer):
         loss_fn: Callable,
         optimiser_fn: Callable,
         circuit_properties: dict,
-        prune: bool,
         use_ray: bool
     ):
         """
@@ -502,16 +536,36 @@ class JaxTrainer(Trainer):
 
         opt_init, opt_update, get_params = optimiser_fn
         opt_state = opt_init(self.init_params)
+        #NOTE these are the same as in TorchQMLTrainer
+        #outer what exactly
+        outer = tqdm(total = self.epochs, 
+                    desc = "Epoch",
+                    position=2,
+                    leave=False,
+                    disable=self.disable_bar,
+                    ascii = " -"
+                    )
+        
+        performance_log = tqdm(
+            total=0,
+            position=3,
+            bar_format="{desc}",
+            leave=False,
+            disable=self.disable_bar)
+        
+
         for epoch_id in range(self.epochs + 1):
+            inner = tqdm(
+                total=self.train_size // self.batch_size,
+                desc="Batch",
+                position=3,
+                leave=False,
+                disable=self.disable_bar,
+                ascii=" -",
+            )
             for batch_id, (sample_batch, _) in enumerate(train_loader):
-                print(type(sample_batch))
-                print(type(optimiser_fn))
-                print(type(loss_fn))
-                print(type(model_fn))
-                print(type(circuit_properties))
+
                 step_id = epoch_id*len(sample_batch) + batch_id
-                print(type(step_id))
-                print(step_id)
                 opt_state, cost = update_fn(
                     loss_fn,
                     opt_state,
@@ -526,7 +580,8 @@ class JaxTrainer(Trainer):
                         self.save_params(self.best_params, tempdir)
                         ray_train.report(
                             metrics={'loss': cost}, checkpoint=Checkpoint.from_directory(tempdir))
-            print(cost)
+                inner.update(1)
+            outer.update(1)
             self.train_loss_hist[self.current_fold, epoch_id] = cost
 
             if epoch_id % self.eval_interval == 0:
@@ -534,21 +589,12 @@ class JaxTrainer(Trainer):
                     model_fn, loss_fn, get_params(opt_state), val_data, circuit_properties
                 )
 
+                self.update_logs(epoch_id, get_params(opt_state), loss, performance_log)
+
                 self.val_loss_histories[
                     self.current_fold, int(epoch_id / self.eval_interval)
                 ] = loss
 
         return get_params(opt_state)
     
-    def validate(
-        self,
-        model: object,
-        loss_fn: Callable,
-        params: qnp.ndarray,  # pylint: disable=no-member
-        val_data: np.ndarray,
-        circuit_properties: dict,
-    ) -> float:
-        
-        loss = loss_fn(params, val_data[:][0], model, circuit_properties)
-
-        return loss
+    

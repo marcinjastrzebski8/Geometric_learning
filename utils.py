@@ -82,7 +82,7 @@ def make_mock_showers(num_data, random_seed, image_length, w_symmetry=False):
         how_many_pixels = np.random.randint(2, 4)
         # pick which pixels
         which_pixels = np.random.choice(
-            range(len(image)), how_many_pixels, replace=True)
+            range(len(image)), how_many_pixels, replace=False)
         # pick values for these pixels
         shower_values = np.random.uniform(0.1, 1, how_many_pixels)
         for value_id, pixel_id in enumerate(which_pixels):

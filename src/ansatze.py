@@ -6,7 +6,6 @@ They do not depend on any data input.
 import numpy as np
 import pennylane as qml
 from pennylane.operation import Operation, AnyWires
-from .twirling import twirl_an_ansatz_w_op, c4_on_4_qubits_w_op
 
 
 class SomeAnsatz(Operation):
@@ -43,35 +42,6 @@ class SomeAnsatz(Operation):
         return op_list
 
     # remember: static method is one you can call on the class itself without instantiating
-    @staticmethod
-    def shape(n_wires, layers):
-        return layers, n_wires
-
-
-class SomeAnsatzTwirled(Operation):
-    """
-    NOTE: when this is called during training, does it get re-instantiated every time?
-    If so this can become a bottleneck maybe?
-    Solution would be to save the resulting ansatz op_list and store it somewhere.
-    NOTE: TO BE DEPRICATED BY GEOMETRICCLASSIFIER CLASS
-    """
-
-    def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"layers": config['layers']}
-
-        super().__init__(params, wires)
-
-    @staticmethod
-    def compute_decomposition(*params, wires=None, **hyperparameters):
-        with qml.queuing.AnnotatedQueue() as q:
-            ansatz_ops = SomeAnsatz.compute_decomposition(
-                *params, wires=wires, **hyperparameters)
-            twirled_ansatz_ops = twirl_an_ansatz_w_op(
-                ansatz_ops, c4_on_4_qubits_w_op)
-        for op in twirled_ansatz_ops:
-            op.queue()
-        return twirled_ansatz_ops
-
     @staticmethod
     def shape(n_wires, layers):
         return layers, n_wires
@@ -121,10 +91,13 @@ class SimpleAnsatz1(Operation):
         for l in range(hyperparameters['layers']):
             for i, wire in enumerate(wires):
                 op_list.append(qml.Hadamard(wires=wire))
-                op_list.append(qml.RX(params[0][l][i], wires=wire))
-                if i != 0:
+                op_list.append(qml.RY(params[0][l][i], wires=wire))
+                if i ==len(wires)-1:
                     op_list.append(qml.PauliRot(
-                        params[0][l][len(wires)], pauli_word='XX', wires=[wire, wires[0]]))
+                        params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[0]]))
+                else:
+                    op_list.append(qml.PauliRot(
+                        params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[i+1]]))
 
         return op_list
 
