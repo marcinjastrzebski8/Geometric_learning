@@ -14,6 +14,7 @@ from basic_example import plot_metrics_from_runs, experiment_on_simple_data
 import itertools
 from sklearn.metrics import roc_curve
 from utils import SymmetricDatasetJax
+from time import time
 
 #TODO: TURN INTO A RAY STUDY WITH MORE EPOCHS, LAYERS, DATA (CLUSTER + JIT)
 N_DATA = 40
@@ -27,6 +28,7 @@ valid_data = SymmetricDatasetJax(N_DATA, 2)[:N_DATA-TRAIN_SIZE]
 embeddings = ['RXEmbedding'] #RXEmbeddingWEnt
 ansatzes = ['SimpleAnsatz0'] #SimpleAnsatz1
 
+start_time = time()
 for embedding, ansatz in itertools.product(embeddings, ansatzes):
     print('ON ', embedding, ansatz)
     for twirled_bool in [False, True]:
@@ -45,5 +47,7 @@ for embedding, ansatz in itertools.product(embeddings, ansatzes):
     
     plot_metrics_from_runs(['standard', 'geometric'], f'first_compare_geo_standard_{embedding}_{ansatz}')
     plot_metrics_from_runs(['standard', 'geometric'],f'roc_curves_{embedding}_{ansatz}', 'roc', valid_data, {'layers':N_LAYERS})
+end_time = time()
 
+print('TOOK', end_time-start_time)
 

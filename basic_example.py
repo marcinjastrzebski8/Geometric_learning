@@ -11,7 +11,7 @@ from src.losses import sigmoid_activation
 import numpy as np
 from sklearn.metrics import roc_curve, roc_auc_score
 from src.utils import loss_dict, circuit_dict
-from pqc_training.trainer import JaxTrainer
+from pqc_training.trainer import JaxTrainer, JaxTrainerJit
 import jax
 from jax.example_libraries import optimizers
 import matplotlib.pyplot as plt
@@ -36,9 +36,6 @@ def experiment_on_simple_data(n_data,
     
    
 
-    #TODO: FIGURE JIT OUT   
-    #loss_fn = jax.jit(loss_fn)
-
     image_size = 2
     num_wires = image_size*image_size
 
@@ -50,7 +47,8 @@ def experiment_on_simple_data(n_data,
 
     #this is made up of three functions; opt_init, opt_update, get_params
     optimiser  = optimizers.adam(lr)
-    loss_fn = loss_dict['bce_loss']
+    #loss_fn = loss_dict['bce_loss']
+    loss_fn = loss_dict['bce_loss_jit']
 
     
 
@@ -74,7 +72,19 @@ def experiment_on_simple_data(n_data,
     np.random.seed(1)
     init_params = np.random.uniform(0, 1, (n_layers, 2*num_wires))
 
+    """
     trainer = JaxTrainer(init_params,
+                     train_size,
+                     test_size,
+                     epochs = n_epochs,
+                     batch_size=batch_size,
+                     callbacks=[],
+                     eval_interval=eval_interval,
+                     save_dir=save_dir)
+    
+    """
+
+    trainer = JaxTrainerJit(init_params,
                      train_size,
                      test_size,
                      epochs = n_epochs,

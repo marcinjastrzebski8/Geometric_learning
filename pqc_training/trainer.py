@@ -20,6 +20,18 @@ from ray.train import Checkpoint
 import tempfile
 import jax
 import jax_dataloader as jdl
+from jax import numpy as jnp
+
+
+def model_predictions_for_jit(params, features, encoder, properties):
+    """
+    Splitting up the funcitonality of the loss so I can jit it.
+    This part sadly cannot be jitted as the encoder param is too abstract.
+    """
+    encoder_outputs = jnp.array([encoder(params, feat, properties)
+                                 for feat in features])
+    
+    return encoder_outputs, features[1]
 
 
 class Colors(str, Enum):
@@ -411,9 +423,6 @@ class TorchQMLTrainer(Trainer):
 class JaxTrainer(Trainer):
     """
     Trainer which uses Jax pipeline. 
-    NOTE: ongoing is organising this module such that I understand it and it makes sense to me
-    inherited from Callum/Mohammad and there were stuff I didn't understand about it
-    #TODO: if i want to jit, I need to understand what to do with arguments, otherwise error thrown
     """
     #@jax.jit
 
@@ -465,7 +474,6 @@ class JaxTrainer(Trainer):
         ):
 
         #vec_model_fn = jax.vmap(model_fn)
-        #@jax.jit
         def cost_fn(p): 
             return loss_fn(
             p,
@@ -597,4 +605,189 @@ class JaxTrainer(Trainer):
 
         return get_params(opt_state)
     
+
+class JaxTrainerJit(Trainer):
+    """
+    Trainer which uses Jax pipeline which I want to make compatible with jitting.
+    """
+    def __init__(self, 
+                 init_params: np.ndarray,
+                 train_size: int = 1,
+                 validation_size: int = 1,
+                 k_folds: int = 1,
+                 epochs: int = 1,
+                 batch_size: int = 1,
+                 callbacks: List = [],
+                 eval_interval: int = 1,
+                 save_dir: str = '',
+                 disable_bar = False):
+
+        super().__init__(init_params,
+                         train_size,
+                         validation_size,
+                         k_folds,
+                         epochs,
+                         batch_size,
+                         callbacks,
+                         eval_interval,
+                         save_dir,
+                         disable_bar)
+        self._use_jax = True
+
+    def classical_update(
+        self,
+        loss_fn,
+        params,
+        model_fn,
+        sample_batch,
+        optimiser_fn,
+        circuit_properties
+    ):
+        """
+        TODO: develop this when needing to compare to classical models - will this be much different to quantum update? prolly not
+        """
+        pass
+    def quantum_update(self,
+        loss_fn: object,
+        opt_state,#: Callable,
+        model_fn,#: object,
+        sample_batch,#: Sequence,
+        optimiser_fn,#: Sequence,
+        circuit_properties: dict,
+        step_id:int,
+        ):
+
+        #vec_model_fn = jax.vmap(model_fn)
+
+        #NOTE: at the moment this is the only bit that I think I can jit
+        #the jitting does not happen here, the loss function passed has to be decorated with jit
+        #the only thing changed here is the functionality is split compared to the non-jitted implementation
+        def cost_fn(params): 
+            outputs, targets = model_predictions_for_jit(params, sample_batch, model_fn, circuit_properties)
+
+            return loss_fn(outputs, targets)
+        
+
+        opt_init, opt_update, get_params = optimiser_fn
+        net_params = get_params(opt_state)
+        loss, grads = jax.value_and_grad(cost_fn)(net_params)
+        return opt_update(step_id, grads, opt_state), loss
+    
+    def update_logs(
+            self, i: int, params: qnp.ndarray, loss: float, performance_log: tqdm  # pylint: disable=no-member
+    ):
+        """
+        NOTE: this just copied from TorchQMLTrainer
+        """
+        performance_log.set_description_str(f"step: {i}, loss: {loss}")
+
+        if (i == 0) & (self.current_fold == 0):
+            self.best_performance_log.set_description_str(
+                f"Best Model saved at step: {i}, loss: {loss}"
+            )
+            self.save_params(params, self.save_dir)
+            self.best_params = params
+        if (i > 0) & (np.all(loss < self.val_loss_histories)):
+            self.best_performance_log.set_description_str(
+                f"Best Model saved at step: {i}, loss: {loss}"
+            )
+            self.save_params(params, self.save_dir)
+            self.best_params = params
+
+        return
+
+    def validate(
+        self,
+        model: object,
+        loss_fn: Callable,
+        params: qnp.ndarray,  # pylint: disable=no-member
+        val_data: np.ndarray,
+        circuit_properties: dict,
+    ) -> float:
+        
+        """
+        Same as TorchQMLTrainer but data not passed as qnp.array
+        """
+        outputs, targets = model_predictions_for_jit(params, val_data[:][0], model, circuit_properties)
+        loss = loss_fn(outputs, targets)
+
+        return loss
+
+    def train_loop(
+        self,
+        model_fn: Callable,
+        train_loader: DataLoader,
+        val_data: np.ndarray,
+        loss_fn: Callable,
+        optimiser_fn: Callable,
+        circuit_properties: dict,
+        use_ray: bool
+    ):
+        """
+        Main training loop.
+        """
+        update_fn = self.quantum_update
+
+        opt_init, opt_update, get_params = optimiser_fn
+        opt_state = opt_init(self.init_params)
+        #NOTE these are the same as in TorchQMLTrainer
+        #outer what exactly
+        outer = tqdm(total = self.epochs, 
+                    desc = "Epoch",
+                    position=2,
+                    leave=False,
+                    disable=self.disable_bar,
+                    ascii = " -"
+                    )
+        
+        performance_log = tqdm(
+            total=0,
+            position=3,
+            bar_format="{desc}",
+            leave=False,
+            disable=self.disable_bar)
+        
+
+        for epoch_id in range(self.epochs + 1):
+            inner = tqdm(
+                total=self.train_size // self.batch_size,
+                desc="Batch",
+                position=3,
+                leave=False,
+                disable=self.disable_bar,
+                ascii=" -",
+            )
+            for batch_id, (sample_batch, _) in enumerate(train_loader):
+
+                step_id = epoch_id*len(sample_batch) + batch_id
+                opt_state, cost = update_fn(
+                    loss_fn,
+                    opt_state,
+                    model_fn,
+                    sample_batch,
+                    optimiser_fn,
+                    circuit_properties,
+                    step_id,
+                    )
+                if use_ray:
+                    with tempfile.TemporaryDirectory() as tempdir:
+                        self.save_params(self.best_params, tempdir)
+                        ray_train.report(
+                            metrics={'loss': cost}, checkpoint=Checkpoint.from_directory(tempdir))
+                inner.update(1)
+            outer.update(1)
+            self.train_loss_hist[self.current_fold, epoch_id] = cost
+
+            if epoch_id % self.eval_interval == 0:
+                loss = self.validate(
+                    model_fn, loss_fn, get_params(opt_state), val_data, circuit_properties
+                )
+
+                self.update_logs(epoch_id, get_params(opt_state), loss, performance_log)
+
+                self.val_loss_histories[
+                    self.current_fold, int(epoch_id / self.eval_interval)
+                ] = loss
+
+        return get_params(opt_state)
     
