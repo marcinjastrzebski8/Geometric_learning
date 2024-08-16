@@ -53,7 +53,7 @@ def experiment_on_simple_data(n_data,
 
     
 
-    save_dir = str(path_to_module / 'models_save_dir/')
+    save_dir = str(path_to_module) + 'models_save_dir/'
     if twirled_bool:
         folder_name = 'geometric'
     else:
@@ -106,7 +106,7 @@ def plot_metrics_from_runs(run_names, figname, which_plot = 'loss', valid_data=N
     """
     Plot losses and roc curves.
     """
-    models_dir = str(path_to_module / 'models_save_dir/')
+    models_dir = str(path_to_module) + 'models_save_dir/'
 
     fig, ax = plt.subplots(1,1)
 
