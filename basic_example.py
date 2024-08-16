@@ -17,9 +17,10 @@ from jax.example_libraries import optimizers
 import matplotlib.pyplot as plt
 from src.twirling import c4_on_4_qubits
 import dill
+from pathlib import Path
 jax.config.update("jax_traceback_filtering", "off")
 jax.config.update('jax_platform_name', 'cpu')
-
+path_to_module = Path('.').absolute()
 
 
 
@@ -52,7 +53,7 @@ def experiment_on_simple_data(n_data,
 
     
 
-    save_dir = '/Users/marcinjastrzebski/Desktop/ACADEMIA/THIRD_YEAR/Geometric_classifier/models_save_dir/'
+    save_dir = str(path_to_module / 'models_save_dir/')
     if twirled_bool:
         folder_name = 'geometric'
     else:
@@ -105,7 +106,7 @@ def plot_metrics_from_runs(run_names, figname, which_plot = 'loss', valid_data=N
     """
     Plot losses and roc curves.
     """
-    models_dir = '/Users/marcinjastrzebski/Desktop/ACADEMIA/THIRD_YEAR/Geometric_classifier/models_save_dir/'
+    models_dir = str(path_to_module / 'models_save_dir/')
 
     fig, ax = plt.subplots(1,1)
 
