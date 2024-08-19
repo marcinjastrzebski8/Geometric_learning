@@ -94,7 +94,7 @@ def experiment_on_simple_data(n_data,
                      eval_interval=eval_interval,
                      save_dir=save_dir)
     
-    params, history, info = trainer.train(train_data=data,
+    params, history, info = trainer.train(data=data,
                                       model_fn=model_fn,
                                       loss_fn=loss_fn,
                                       optimiser_fn=optimiser,

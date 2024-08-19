@@ -143,7 +143,7 @@ class Trainer(ABC):
 
     def train(
         self,
-        train_data: Union[Dataset,jdl.Dataset],
+        data: Union[Dataset,jdl.Dataset],
         model_fn: object,
         loss_fn: object,
         optimiser_fn: object,
@@ -153,7 +153,7 @@ class Trainer(ABC):
         """function needs to be simplified
 
         Args:
-            train_data (Dataset): _description_
+            data (Dataset): _description_
             validation_size (int): _description_
             model_fn (object): _description_
             loss_fn (object): _description_
@@ -196,22 +196,25 @@ class Trainer(ABC):
 
         for i in range(self.k_folds):
             self.current_fold = i
-            train_ids, val_ids = train_data.split(
+            train_ids, val_ids = data.split(
                 self.train_size, self.validation_size)
+            
+            val_data = jdl.ArrayDataset(*data[val_ids])
+            train_data = jdl.ArrayDataset(*data[train_ids])
+            
             if self._use_jax:
                 train_loader = jdl.DataLoader(train_data,
                                               backend='jax',
                                               batch_size=int(self.batch_size),
                                               shuffle = True)
             else:
+                #this seems overly complicated
                 train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
                 train_loader = DataLoader(
                     train_data,
                     batch_size=int(self.batch_size),
                     sampler=train_subsampler,
                 )
-
-            val_data = train_data[val_ids]
 
             params = self.train_loop(
                 model_fn,
@@ -587,7 +590,7 @@ class JaxTrainer(Trainer):
                     with tempfile.TemporaryDirectory() as tempdir:
                         self.save_params(self.best_params, tempdir)
                         ray_train.report(
-                            metrics={'loss': cost}, checkpoint=Checkpoint.from_directory(tempdir))
+                            metrics={'loss': float(cost)}, checkpoint=Checkpoint.from_directory(tempdir))
                 inner.update(1)
             outer.update(1)
             self.train_loss_hist[self.current_fold, epoch_id] = cost

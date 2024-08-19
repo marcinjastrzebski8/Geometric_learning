@@ -8,51 +8,12 @@ import pennylane as qml
 from pennylane.operation import Operation, AnyWires
 
 
-class SomeAnsatz(Operation):
-    """
-    Copying Ansatz1 from Callum
-    """
-    num_wires = AnyWires
-    grad_method = None
-
-    def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"layers": config['layers']}
-
-        super().__init__(params, wires)
-
-    @staticmethod
-    def compute_decomposition(*params, wires=None, **hyperparameters):
-        """
-        NOTE: Callum took layers and weights as parameters,
-        I want to be compatible with parent class
-        """
-        op_list = []
-        wires = qml.wires.Wires(wires)
-        for l in range(hyperparameters['layers']):
-            for i, wire in enumerate(wires):
-                op_list.append(qml.RY(params[0][l][i], wires=wire))
-            for i, wire in enumerate(wires):
-                if i == len(wires)-1:
-                    op_list.append(qml.PauliRot(
-                        params[0][l][len(wires)+i], pauli_word='ZZ', wires=[wire, wires[0]]))
-                else:
-                    op_list.append(qml.PauliRot(
-                        params[0][l][len(wires)+i], pauli_word='ZZ', wires=[wire, wires[i+1]]))
-
-        return op_list
-
-    # remember: static method is one you can call on the class itself without instantiating
-    @staticmethod
-    def shape(n_wires, layers):
-        return layers, n_wires
-
-
 class SimpleAnsatz0(Operation):
     num_wires = AnyWires
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"layers": config["layers"]}
+        self._hyperparameters = {"n_layers": config["n_layers"]}
 
         super().__init__(params, wires)
 
@@ -64,7 +25,7 @@ class SimpleAnsatz0(Operation):
     def compute_decomposition(*params, wires=None, **hyperparameters):
         op_list = []
         wires = qml.wires.Wires(wires)
-        for l in range(hyperparameters['layers']):
+        for l in range(hyperparameters['n_layers']):
             for i, wire in enumerate(wires):
                 op_list.append(qml.RY(params[0][l][i], wires=wire))
 
@@ -72,11 +33,14 @@ class SimpleAnsatz0(Operation):
 
 
 class SimpleAnsatz1(Operation):
+    """
+    I think this is stolen from Callum. It's IQP-esque but I don't think it's based on anything rigorous.
+    """
     num_wires = AnyWires
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"layers": config["layers"]}
+        self._hyperparameters = {"n_layers": config["n_layers"]}
 
         super().__init__(params, wires)
 
@@ -88,7 +52,7 @@ class SimpleAnsatz1(Operation):
     def compute_decomposition(*params, wires=None, **hyperparameters):
         op_list = []
         wires = qml.wires.Wires(wires)
-        for l in range(hyperparameters['layers']):
+        for l in range(hyperparameters['n_layers']):
             for i, wire in enumerate(wires):
                 op_list.append(qml.Hadamard(wires=wire))
                 op_list.append(qml.RY(params[0][l][i], wires=wire))
@@ -101,6 +65,45 @@ class SimpleAnsatz1(Operation):
 
         return op_list
 
+class GeneralCascadingAnsatz(Operation):
+    """
+    SimpleAnsatz1 generalised to general pauli-word rotations.
+    Also got rid of the hadamard.
+    """
+    num_wires = AnyWires
+    grad_method = None
+
+    def __init__(self, params, wires=None, config=None):
+        """
+        single_qubit_pauli is a qml single qubit rotation gate (e.g. qml.RX)
+        two_qubit_pauli is a pauli word, e.g. 'ZZ'
+        """
+        self._hyperparameters = {"n_layers": config["n_layers"],
+                                 "single_qubit_pauli": config['single_qubit_pauli'],
+                                 'two_qubit_pauli': config['two_qubit_pauli']}
+
+        super().__init__(params, wires)
+
+    @staticmethod
+    def shape(n_wires, layers):
+        return layers, n_wires
+
+    @staticmethod
+    def compute_decomposition(*params, wires=None, **hyperparameters):
+        op_list = []
+        wires = qml.wires.Wires(wires)
+        for l in range(hyperparameters['n_layers']):
+            for i, wire in enumerate(wires):
+                op_list.append(hyperparameters['single_qubit_pauli'](params[0][l][i], wires=wire))
+                if i ==len(wires)-1:
+                    op_list.append(qml.PauliRot(
+                        params[0][l][len(wires)+i], pauli_word=hyperparameters['two_qubit_pauli'], wires=[wire, wires[0]]))
+                else:
+                    op_list.append(qml.PauliRot(
+                        params[0][l][len(wires)+i], pauli_word=hyperparameters['two_qubit_pauli'], wires=[wire, wires[i+1]]))
+
+        return op_list
+    
 
 class HardcodedTwirledSimpleAnsatz0(Operation):
     """
@@ -113,7 +116,7 @@ class HardcodedTwirledSimpleAnsatz0(Operation):
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"layers": config["layers"]}
+        self._hyperparameters = {"n_layers": config["n_layers"]}
 
         super().__init__(params, wires)
 
@@ -125,7 +128,7 @@ class HardcodedTwirledSimpleAnsatz0(Operation):
     def compute_decomposition(*params, **hyperparameters):
         op_list = []
         wires = [0, 1]
-        for l in range(hyperparameters['layers']):
+        for l in range(hyperparameters['n_layers']):
             # for each Y gate, now the Y gate is applied to all qubits
             # with half the parameter
             for i, wire in enumerate(wires):
