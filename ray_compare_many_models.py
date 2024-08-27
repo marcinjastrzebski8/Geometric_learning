@@ -25,7 +25,7 @@ from utils import SymmetricDatasetJax
 from jax.example_libraries import optimizers
 import numpy as np
 from src.geometric_classifier import GeometricClassifierJax
-from src.twirling import c4_on_4_qubits
+from src.twirling import c4_rep_on_qubits
 from src.utils import loss_dict
 from pqc_training.trainer import JaxTrainer
 import argparse
@@ -49,7 +49,7 @@ def main(json_config):
     validation_size = 1 
     eval_interval = 50
 
-    image_size = 2
+    image_size = json_config['image_size']
     num_wires = image_size*image_size
 
     # produce data
@@ -63,9 +63,9 @@ def main(json_config):
 
         # NOTE: params_per_layer is tied to the ansatz used and hardcoded here
         init_params = np.random.uniform(
-            0, 1, (config['n_layers'], 8))
-
-        model = GeometricClassifierJax('RotEmbeddingWEnt', 'GeneralCascadingAnsatz', num_wires, config['twirled_bool'], c4_on_4_qubits)
+            0, 1, (config['n_layers'], num_wires*2))
+        #NOTE: HARCODING THE INVARIANT MEASUREMENT FOR NOW
+        model = GeometricClassifierJax('RotEmbedding', 'GeneralCascadingAnsatz', num_wires, config['twirled_bool'], c4_rep_on_qubits, group_commuting_meas=qml.Z(0)@qml.Z(1)@qml.Z(2)@qml.Z(3), image_size=image_size)
         model_fn = model.prediction_circuit
 
         optimiser_fn = optimizers.adam(lr)
@@ -90,7 +90,7 @@ def main(json_config):
 
 
     # define search space for hyperparameters
-    single_qubit_pauli = [qml.RX, qml.RY, qml.RZ]
+    single_qubit_pauli = [qml.RX, qml.RY]
     two_qubit_pauli = [combo[0] + combo[1] for combo in itertools.combinations_with_replacement(['X','Y','Z'], r=2)]
 
     search_space = {'single_qubit_pauli': tune.choice(single_qubit_pauli), 

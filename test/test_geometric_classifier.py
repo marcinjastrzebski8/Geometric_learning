@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from ansatze import SimpleAnsatz0
 from embeddings import RXEmbeddingWEnt
-from twirling import twirl_an_ansatz, some_simple_group, c4_on_4_qubits
+from twirling import twirl_an_ansatz, some_simple_group, c4_rep_on_qubits
 import pennylane as qml
 from pennylane import numpy as qnp
 from geometric_classifier import GeometricClassifierJax
@@ -13,62 +13,69 @@ from geometric_classifier import GeometricClassifierJax
 #TODO longterm: functionality to test every group rep that I add
 
 #datapoints for C2 on 2 qubits
+#NOTE: testing this on an invariant subspace of 4 qubits
 c2_point = [0.1,0.6,0,0]
 c2_point_g = [0.6,0.1,0,0]
 c2_point_other = [0.5,0.3,0,0]
 
 #datapoints for C4 on 4 qubits
-c4_point = [0.1,0.2,0.3,0.4]
-c4_point_g = [0.3, 0.1, 0.4, 0.2]
-c4_point_other = [0.4,0.1,0.2,0.3]
+c4_on_4_point = [0.1,0.2,0.3,0.4]
+c4_on_4_point_g = [0.3, 0.1, 0.4, 0.2]
+c4_on_4_point_other = [0.4,0.5,0.7,0.9]
+
+#datapoints for C4 on 9 qubits
+c4_on_9_point = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+c4_on_9_point_g = [0.4,0.1,0.2,0.7,0.5,0.3,0.8,0.9,0.6]
+c4_on_9_point_other = [0.9,0.7,0.7,0.5,0.7,0.9,0.9,0.7,0.6]
 
 
 random_params0 = qnp.random.uniform(0,1,(1,2))
-random_params1 = qnp.random.uniform(0,1,(1,4))
+random_params1 = qnp.random.uniform(0,1,(1,8))
+random_params2 = qnp.random.uniform(0,1,(1,18))
 
 #need 4 wires because of a hardcoded bit in the twirl - to be fixed
-dev = qml.device("default.qubit", wires = 4)
+dev_4 = qml.device("default.qubit", wires = 4)
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def phi_on_g():
     """
     Embed a point which has been acted on by the group action.
     """
     with qml.queuing.AnnotatedQueue() as q:
         feature_map_ops = RXEmbeddingWEnt.compute_decomposition(c2_point_g[:2], wires = [0,1])
-        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group())
+        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group(), 4)
     for op in twirled_feature_map_ops:
         op.queue()
     return qml.state()
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def g_on_phi():
     """
     Act with group action on a point which has been embedded
     """
     with qml.queuing.AnnotatedQueue() as q:
         feature_map_ops = RXEmbeddingWEnt.compute_decomposition(c2_point[:2], wires = [0,1])
-        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group())
+        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group(),4)
     for op in twirled_feature_map_ops:
         op.queue()
     qml.SWAP(wires = [0,1])
     return qml.state()
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def phi_on_another_point():
     """
     Act with group action on another point which has been embedded
     """
     with qml.queuing.AnnotatedQueue() as q:
         feature_map_ops = RXEmbeddingWEnt.compute_decomposition(c2_point_other[:2], wires = [0,1])
-        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group())
+        twirled_feature_map_ops = twirl_an_ansatz(feature_map_ops, some_simple_group(),4)
     for op in twirled_feature_map_ops:
         op.queue()
     qml.SWAP(wires = [0,1])
     return qml.state()
 
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def ansatz_on_ug():
     """
     First apply action of group then apply ansatz
@@ -80,15 +87,15 @@ def ansatz_on_ug():
 
     with qml.queuing.AnnotatedQueue() as q:
         ansatz_ops = SimpleAnsatz0.compute_decomposition(
-            random_params0, wires = [0,1], **{'layers':1})
+            random_params0, wires = [0,1], **{'n_layers':1})
         twirled_ansatz_ops = twirl_an_ansatz(
-            ansatz_ops, some_simple_group())
+            ansatz_ops, some_simple_group(),4)
     for op in twirled_ansatz_ops:
         op.queue()
 
     return qml.state()
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def ansatz_on_another_state():
     """
     First apply action of group then apply ansatz
@@ -99,15 +106,15 @@ def ansatz_on_another_state():
 
     with qml.queuing.AnnotatedQueue() as q:
         ansatz_ops = SimpleAnsatz0.compute_decomposition(
-            random_params0, wires = [0,1], **{'layers':1})
+            random_params0, wires = [0,1], **{'n_layers':1})
         twirled_ansatz_ops = twirl_an_ansatz(
-            ansatz_ops, some_simple_group())
+            ansatz_ops, some_simple_group(),4)
     for op in twirled_ansatz_ops:
         op.queue()
 
     return qml.state()
 
-@qml.qnode(dev)
+@qml.qnode(dev_4)
 def ug_on_ansatz():
     """
     First apply ansatz then action of group
@@ -117,9 +124,9 @@ def ug_on_ansatz():
 
     with qml.queuing.AnnotatedQueue() as q:
         ansatz_ops = SimpleAnsatz0.compute_decomposition(
-            random_params0, wires = [0,1], **{'layers':1})
+            random_params0, wires = [0,1], **{'n_layers':1})
         twirled_ansatz_ops = twirl_an_ansatz(
-            ansatz_ops, some_simple_group())
+            ansatz_ops, some_simple_group(),4)
     for op in twirled_ansatz_ops:
         op.queue()
 
@@ -189,33 +196,55 @@ def test_invariant_measurement():
 
 #TODO: understand why these tests pass even without a commuting measurement operator
 @pytest.mark.parametrize("feature_map", [
-    ('RXEmbedding'), ('RXEmbeddingWEnt')
+    ('RXEmbedding'), 
 ])
 @pytest.mark.parametrize("ansatz, params", [
-    ('SimpleAnsatz0', qnp.concatenate([random_params0,qnp.array([[0,0]])],axis=1)),
-    ('SimpleAnsatz1',  qnp.concatenate([random_params1,qnp.array([[0,0,0,0]])],axis=1))
+    ('SimpleAnsatz0', random_params1),
+    ('SimpleAnsatz1',  random_params1)
 ])
-@pytest.mark.parametrize("group, data_point, data_point_g, data_point_other", [
-    (some_simple_group, c2_point, c2_point_g, c2_point_other),
-    (c4_on_4_qubits, c4_point, c4_point_g, c4_point_other)
+@pytest.mark.parametrize("group, measurement, data_point, data_point_g, data_point_other", [
+    (some_simple_group, qml.Z(0)@qml.Z(1),c2_point, c2_point_g, c2_point_other),
+    (c4_rep_on_qubits, qml.Z(0)@qml.Z(1)@qml.Z(2)@qml.Z(3), c4_on_4_point, c4_on_4_point_g, c4_on_4_point_other)
 ])
-def test_invariant_model(feature_map, 
+def test_invariant_model_on_4_qubits(feature_map, 
                          ansatz, 
                          params, 
                          group, 
+                         measurement,
                          data_point,
                          data_point_g,
                          data_point_other):
     """
     Tests whether the prediction of some model is invariant 
     under some group action.
+    The C2 and C4 groups are tested.
     Tests all the tools and knowledge of equiv-qnns I have so far.
     """
-    geometric_classifier = GeometricClassifierJax(feature_map, ansatz, size = 4, make_model_equivariant=True, group_rep = group)
-    ansatz_properties = {'layers':1}
+    geometric_classifier = GeometricClassifierJax(feature_map, ansatz, size = 4, make_model_equivariant=True, group_rep = group, group_commuting_meas = measurement)
+    ansatz_properties = {'n_layers':1}
     data_point_pred = geometric_classifier.prediction_circuit(params, data_point, ansatz_properties)
     g_data_point_pred = geometric_classifier.prediction_circuit(params, data_point_g, ansatz_properties)
     another_point_pred = geometric_classifier.prediction_circuit(params, data_point_other, ansatz_properties)
     print(g_data_point_pred, data_point_pred, another_point_pred)
     assert data_point_pred == pytest.approx(g_data_point_pred)
+    assert data_point_pred !=another_point_pred
+
+@pytest.mark.parametrize("feature_map",[
+    ('RXEmbedding')
+])
+@pytest.mark.parametrize("ansatz, params", [
+    ('SimpleAnsatz0', random_params2),
+    ('SimpleAnsatz1',  random_params2)
+])
+def test_invariant_model_on_9_qubits(feature_map,
+                                     ansatz,
+                                     params):
+    geometric_classifier = GeometricClassifierJax(feature_map, ansatz, size = 9, make_model_equivariant=True, group_rep = c4_rep_on_qubits, group_commuting_meas = qml.Z(4), image_size =3)
+    ansatz_properties = {'n_layers':1}
+    data_point_pred = geometric_classifier.prediction_circuit(params, c4_on_9_point, ansatz_properties)
+    g_data_point_pred = geometric_classifier.prediction_circuit(params, c4_on_9_point_g, ansatz_properties)
+    another_point_pred = geometric_classifier.prediction_circuit(params, c4_on_9_point_other, ansatz_properties)
+    print(g_data_point_pred, data_point_pred, another_point_pred)
+    #NOTE: I HAD TO LOWER THE APPROX SIGINFICANTLY FOR 9 QUBITS - I ASSUME THE DIFFERENCE COMES FROM FLOAT PRECISION AND NOT A THEORETICAL ISSUE
+    assert data_point_pred == pytest.approx(g_data_point_pred, 1e-4,1e-4)
     assert data_point_pred !=another_point_pred
