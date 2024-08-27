@@ -102,7 +102,7 @@ def main(json_config):
 
     # set up ray with weights and biases logging
     ray.init(num_cpus=json_config['n_cpus'])
-    scheduler = ASHAScheduler(time_attr = "training_oteration",max_t = train_size*n_epochs/batch_size)
+    scheduler = ASHAScheduler(time_attr = "training_iteration", max_t = 200)
     trainable_with_resources = tune.with_resources(
         train_ray, {'cpu': json_config['n_cpus_per_model']})
     run_config = ray_train.RunConfig(storage_path=path_to_package, name=json_config['output_models_dir'], callbacks=[WandbLoggerCallback(project=json_config['output_models_dir'])], checkpoint_config=ray_train.CheckpointConfig(
