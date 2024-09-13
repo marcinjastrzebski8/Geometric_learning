@@ -24,7 +24,7 @@ from ray import tune
 from utils import SymmetricDatasetJax
 from jax.example_libraries import optimizers
 import numpy as np
-from src.geometric_classifier import GeometricClassifierJax
+from src.geometric_classifier import GeometricClassifierAutotwirlJax
 from src.twirling import c4_rep_on_qubits
 from src.utils import loss_dict
 from pqc_training.trainer import JaxTrainer
@@ -36,17 +36,18 @@ import itertools
 api = wandb.Api()
 path_to_package = Path('.').absolute()
 
+
 def main(json_config):
 
-    #keeping all these constant as I want this to be a study of standard vs geo models not search for best ever model
+    # keeping all these constant as I want this to be a study of standard vs geo models not search for best ever model
     lr = 0.001
     n_epochs = 50
     batch_size = 50
     train_size = 500
 
-    #I don't use the validation option as im not interested in the validation loss
-    #but i think things will break if i dont define these
-    validation_size = 1 
+    # I don't use the validation option as im not interested in the validation loss
+    # but i think things will break if i dont define these
+    validation_size = 1
     eval_interval = 50
 
     image_size = json_config['image_size']
@@ -64,14 +65,15 @@ def main(json_config):
         # NOTE: params_per_layer is tied to the ansatz used and hardcoded here
         init_params = np.random.uniform(
             0, 1, (config['n_layers'], num_wires*2))
-        #NOTE: HARCODING THE INVARIANT MEASUREMENT FOR NOW
-        model = GeometricClassifierJax('RotEmbedding', 'GeneralCascadingAnsatz', num_wires, config['twirled_bool'], c4_rep_on_qubits, group_commuting_meas=qml.Z(0)@qml.Z(1)@qml.Z(2)@qml.Z(3), image_size=image_size)
+        # NOTE: HARCODING THE INVARIANT MEASUREMENT FOR NOW
+        model = GeometricClassifierAutotwirlJax('RotEmbedding', 'GeneralCascadingAnsatz', num_wires, config['twirled_bool'], c4_rep_on_qubits, group_commuting_meas=qml.Z(
+            0)@qml.Z(1)@qml.Z(2)@qml.Z(3), image_size=image_size)
         model_fn = model.prediction_circuit
 
         optimiser_fn = optimizers.adam(lr)
         loss_fn = loss_dict['bce_loss']
 
-        trainer = JaxTrainer(init_params, 
+        trainer = JaxTrainer(init_params,
                              train_size,
                              validation_size,
                              1,
@@ -82,27 +84,28 @@ def main(json_config):
                              str(path_to_package)+'/'+json_config['local_model_save_dir'])
 
         params, history, info = trainer.train(data,
-                      model_fn,
-                      loss_fn,
-                      optimiser_fn,
-                      config,
-                      True)
-
+                                              model_fn,
+                                              loss_fn,
+                                              optimiser_fn,
+                                              config,
+                                              True)
 
     # define search space for hyperparameters
     single_qubit_pauli = [qml.RX, qml.RY]
-    two_qubit_pauli = [combo[0] + combo[1] for combo in itertools.combinations_with_replacement(['X','Y','Z'], r=2)]
+    two_qubit_pauli = [combo[0] + combo[1]
+                       for combo in itertools.combinations_with_replacement(['X', 'Y', 'Z'], r=2)]
 
-    search_space = {'single_qubit_pauli': tune.choice(single_qubit_pauli), 
+    search_space = {'single_qubit_pauli': tune.choice(single_qubit_pauli),
                     'two_qubit_pauli': tune.choice(two_qubit_pauli),
                     'embedding_pauli': tune.choice(single_qubit_pauli),
                     'n_layers': tune.randint(1, 6),
-                    'twirled_bool': tune.grid_search([True,False])
+                    'twirled_bool': tune.grid_search([True, False])
                     }
 
     # set up ray with weights and biases logging
     ray.init(num_cpus=json_config['n_cpus'])
-    scheduler = ASHAScheduler(time_attr = "training_oteration",max_t = train_size*n_epochs/batch_size)
+    scheduler = ASHAScheduler(
+        time_attr="training_oteration", max_t=train_size*n_epochs/batch_size)
     trainable_with_resources = tune.with_resources(
         train_ray, {'cpu': json_config['n_cpus_per_model']})
     run_config = ray_train.RunConfig(storage_path=path_to_package, name=json_config['output_models_dir'], callbacks=[WandbLoggerCallback(project=json_config['output_models_dir'])], checkpoint_config=ray_train.CheckpointConfig(

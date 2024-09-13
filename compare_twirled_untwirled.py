@@ -17,10 +17,10 @@ from utils import SymmetricDatasetJax
 from time import time
 
 #TODO: TURN INTO A RAY STUDY WITH MORE EPOCHS, LAYERS, DATA (CLUSTER + JIT)
-N_DATA = 40
-TRAIN_SIZE = 32
-N_EPOCHS = 5
-BATCH_SIZE = 2
+N_DATA = 200
+TRAIN_SIZE = 160
+N_EPOCHS = 20
+BATCH_SIZE = 40
 EVAL_INTERVAL = 1 #note i think epochs needs to be divisible by eval_interval
 LR = 0.001
 N_LAYERS = 2
@@ -46,7 +46,7 @@ for embedding, ansatz in itertools.product(embeddings, ansatzes):
         )
     
     plot_metrics_from_runs(['standard', 'geometric'], f'first_compare_geo_standard_{embedding}_{ansatz}')
-    plot_metrics_from_runs(['standard', 'geometric'],f'roc_curves_{embedding}_{ansatz}', 'roc', valid_data, {'layers':N_LAYERS})
+    plot_metrics_from_runs(['standard', 'geometric'],f'roc_curves_{embedding}_{ansatz}', 'roc', valid_data, {'n_layers':N_LAYERS})
 end_time = time()
 
 print('TOOK', end_time-start_time)

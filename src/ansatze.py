@@ -13,8 +13,7 @@ class SimpleAnsatz0(Operation):
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"n_layers": config["n_layers"]}
-
+        self._hyperparameters = {'n_layers': config['n_layers']}
         super().__init__(params, wires)
 
     @staticmethod
@@ -40,8 +39,7 @@ class SimpleAnsatz1(Operation):
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"n_layers": config["n_layers"]}
-
+        self._hyperparameters = {'n_layers': config['n_layers']}
         super().__init__(params, wires)
 
     @staticmethod
@@ -56,7 +54,7 @@ class SimpleAnsatz1(Operation):
             for i, wire in enumerate(wires):
                 op_list.append(qml.Hadamard(wires=wire))
                 op_list.append(qml.RY(params[0][l][i], wires=wire))
-                if i ==len(wires)-1:
+                if i == len(wires)-1:
                     op_list.append(qml.PauliRot(
                         params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[0]]))
                 else:
@@ -64,6 +62,7 @@ class SimpleAnsatz1(Operation):
                         params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[i+1]]))
 
         return op_list
+
 
 class GeneralCascadingAnsatz(Operation):
     """
@@ -74,14 +73,9 @@ class GeneralCascadingAnsatz(Operation):
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        """
-        single_qubit_pauli is a qml single qubit rotation gate (e.g. qml.RX)
-        two_qubit_pauli is a pauli word, e.g. 'ZZ'
-        """
-        self._hyperparameters = {"n_layers": config["n_layers"],
-                                 "single_qubit_pauli": config['single_qubit_pauli'],
+        self._hyperparameters = {'n_layers': config['n_layers'],
+                                 'single_qubit_pauli': config['single_qubit_pauli'],
                                  'two_qubit_pauli': config['two_qubit_pauli']}
-
         super().__init__(params, wires)
 
     @staticmethod
@@ -90,12 +84,18 @@ class GeneralCascadingAnsatz(Operation):
 
     @staticmethod
     def compute_decomposition(*params, wires=None, **hyperparameters):
+        """
+        single_qubit_pauli is a qml single qubit rotation gate (e.g. qml.RX)
+        two_qubit_pauli is a pauli word, e.g. 'ZZ'
+        """
+
         op_list = []
         wires = qml.wires.Wires(wires)
         for l in range(hyperparameters['n_layers']):
             for i, wire in enumerate(wires):
-                op_list.append(hyperparameters['single_qubit_pauli'](params[0][l][i], wires=wire))
-                if i ==len(wires)-1:
+                op_list.append(hyperparameters['single_qubit_pauli'](
+                    params[0][l][i], wires=wire))
+                if i == len(wires)-1:
                     op_list.append(qml.PauliRot(
                         params[0][l][len(wires)+i], pauli_word=hyperparameters['two_qubit_pauli'], wires=[wire, wires[0]]))
                 else:
@@ -103,7 +103,7 @@ class GeneralCascadingAnsatz(Operation):
                         params[0][l][len(wires)+i], pauli_word=hyperparameters['two_qubit_pauli'], wires=[wire, wires[i+1]]))
 
         return op_list
-    
+
 
 class HardcodedTwirledSimpleAnsatz0(Operation):
     """
@@ -116,8 +116,7 @@ class HardcodedTwirledSimpleAnsatz0(Operation):
     grad_method = None
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {"n_layers": config["n_layers"]}
-
+        self._hyperparameters = {'n_layers': config['n_layers']}
         super().__init__(params, wires)
 
     @staticmethod
@@ -134,4 +133,62 @@ class HardcodedTwirledSimpleAnsatz0(Operation):
             for i, wire in enumerate(wires):
                 op_list.append(qml.RY(params[0][l][i]/2, wires=0))
                 op_list.append(qml.RY(params[0][l][i]/2, wires=1))
+        return op_list
+
+
+class GeometricAnsatzConstructor(Operation):
+    """
+    Construct an equivariant ansatz from a set of equivarant gates.
+    Each 'instruction' corresponds to a single gate before twirling.
+    After twirling usually becomes multiple gates with a shared parameter.
+
+    Assumes an n_layers-repeated structure of :
+    -/- 1-local gates -/- 2-local gates -/-
+    """
+
+    def __init__(self, params, wires, config):
+        # NOTE: these are being implicitly passed to compute_decomposition
+        self._hyperparameters = {"group_equiv_1local_gate": config['group_equiv_1local_gate'],
+                                 'group_equiv_2local_gate': config['group_equiv_2local_gate'],
+                                 'gate_1local_instructions': config['gate_1local_instructions'],
+                                 'gate_2local_instructions': config['gate_2local_instructions'],
+                                 'n_layers': config['n_layers']
+                                 }
+
+        super().__init__(params, wires)
+
+    @staticmethod
+    def compute_decomposition(*params, wires=None, **hyperparams):
+        """
+        Allows to create any ansatz of the (1local-2local) x n_layers shape
+        """
+        print(hyperparams)
+        group_equiv_1local_gate = hyperparams['group_equiv_1local_gate']
+        group_equiv_2local_gate = hyperparams['group_equiv_2local_gate']
+        gate_1local_instructions = hyperparams['gate_1local_instructions']
+        gate_2local_instructions = hyperparams['gate_2local_instructions']
+        n_layers = hyperparams['n_layers']
+        n_1local_gates = len(gate_1local_instructions)
+        n_2local_gates = len(gate_2local_instructions)
+        print('params:', params)
+        print(n_layers)
+        print(n_1local_gates)
+        print(n_2local_gates)
+        assert np.shape(*params) == (n_layers,
+                                     len([hyperparams['gate_1local_instructions']])+len([hyperparams['gate_2local_instructions']]))
+
+        op_list = []
+        for layer_id in range(n_layers):
+            print(layer_id)
+            for gate_id, gate_1local_instruction in enumerate(hyperparams['gate_1local_instructions']):
+                print(gate_id)
+                op_list.append(hyperparams['group_equiv_1local_gate'](
+                    params[0][layer_id][gate_id], config=gate_1local_instruction))
+
+            for gate_id, gate_2local_instruction in enumerate(hyperparams['gate_2local_instructions']):
+                print(gate_id)
+                print(params[0][layer_id])
+                op_list.append(hyperparams['group_equiv_2local_gate'](params[0][layer_id][len(
+                    hyperparams['gate_1local_instructions'])+gate_id], config=gate_2local_instruction))
+
         return op_list
