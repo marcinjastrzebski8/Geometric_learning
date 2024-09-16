@@ -7,10 +7,7 @@ import pennylane as qml
 from typing import Sequence
 
 
-# NOTE: I think there's some inconsistencies in the way I define circuits which are used by these classes
-# namely, all circuits take from the Operation class and some are passed using .compute_decomposition()
-# whilst others just with the init. But the init somehow results in them being called properly?
-# im a bit confused and it's the Operation class at the heart of it
+#NOTE: when the Operation class is called via its init, it uses compute_decomposition implicitly
 class GeometricClassifierAutotwirlJax():
     """
     Generic classifier which uses jax. Has the option to twirl the ansatz. 
