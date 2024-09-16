@@ -162,7 +162,7 @@ class GeometricAnsatzConstructor(Operation):
         """
         Allows to create any ansatz of the (1local-2local) x n_layers shape
         """
-        print(hyperparams)
+        # TODO: CLEAN THIS UP I WASNT SURE IF I CAN DEFINE VARIABLES WITHOUT THEM BEING ADDED TO THE QUEUE
         group_equiv_1local_gate = hyperparams['group_equiv_1local_gate']
         group_equiv_2local_gate = hyperparams['group_equiv_2local_gate']
         gate_1local_instructions = hyperparams['gate_1local_instructions']
@@ -170,24 +170,16 @@ class GeometricAnsatzConstructor(Operation):
         n_layers = hyperparams['n_layers']
         n_1local_gates = len(gate_1local_instructions)
         n_2local_gates = len(gate_2local_instructions)
-        print('params:', params)
-        print(n_layers)
-        print(n_1local_gates)
-        print(n_2local_gates)
         assert np.shape(*params) == (n_layers,
-                                     len([hyperparams['gate_1local_instructions']])+len([hyperparams['gate_2local_instructions']]))
+                                     len(hyperparams['gate_1local_instructions'])+len(hyperparams['gate_2local_instructions']))
 
         op_list = []
         for layer_id in range(n_layers):
-            print(layer_id)
             for gate_id, gate_1local_instruction in enumerate(hyperparams['gate_1local_instructions']):
-                print(gate_id)
                 op_list.append(hyperparams['group_equiv_1local_gate'](
                     params[0][layer_id][gate_id], config=gate_1local_instruction))
 
             for gate_id, gate_2local_instruction in enumerate(hyperparams['gate_2local_instructions']):
-                print(gate_id)
-                print(params[0][layer_id])
                 op_list.append(hyperparams['group_equiv_2local_gate'](params[0][layer_id][len(
                     hyperparams['gate_1local_instructions'])+gate_id], config=gate_2local_instruction))
 

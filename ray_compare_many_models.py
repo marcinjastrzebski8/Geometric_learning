@@ -1,5 +1,5 @@
 """
-Perform a ray study of many models on the small 2x2 classification toy dataset.
+Perform a ray study of many models on the small classification toy dataset.
 
 Run from the terminal with one argument: path to a run config file.
 The config file needs to be a .json file
@@ -35,6 +35,8 @@ import itertools
 
 api = wandb.Api()
 path_to_package = Path('.').absolute()
+# TODO: UPDATE THIS TO USE NEW TWIRLING [PRE-TWIRLED GATE BANK] METHOD.
+# THEN TRY TO RUN A 3X3 STUDY
 
 
 def main(json_config):
