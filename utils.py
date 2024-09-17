@@ -4,7 +4,7 @@ from pennylane import numpy as qnp
 import jax_dataloader as jdl
 from torch.utils.data import Dataset
 import pandas as pd
-import os 
+import os
 import re
 from pathlib import Path
 
@@ -122,10 +122,12 @@ class SymmetricDataset(Dataset):
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
 
+
 class SymmetricDatasetJax(jdl.Dataset):
     """
     TODO: Change functionality somehow to allow either torch or jax and not have to repeat code.
     """
+
     def __init__(self, size, image_length):
         data_df = mock_image_dataset(size, 8, image_length)
         self.data = np.array(data_df['data'].tolist())
@@ -150,7 +152,6 @@ class SymmetricDatasetJax(jdl.Dataset):
         val_idx = np.random.choice(
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
-
 
 
 def simple_symmetric_dataset(size):
@@ -193,6 +194,7 @@ class SimpleSymmetricDataset(Dataset):
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
 
+
 def match_run_dir(model_name, path_to_saved_results):
     # outputs the directory for a model; like model_name_0001_lr=3....
     # path_to_package.parent/saved_results_name
@@ -201,6 +203,7 @@ def match_run_dir(model_name, path_to_saved_results):
         if re.search(model_name, dir_name) is not None:
             run_dir_name = dir_name
     return run_dir_name
+
 
 def find_latest_checkpoint_dir(run_path):
     # outputs directory of the latest checkpoint; like checkpoint000010
@@ -239,9 +242,11 @@ def get_model_names_from_wandb(api, project_name):
             # get last loss obtained during hyperopt
             try:
                 loss = run.history().loss.tolist()[-1]
+                model = run.name
+                models_w_losses[f'{model}'] = loss
             except (AttributeError):
                 pass
-            model = run.name
-            models_w_losses[f'{model}'] = loss
+
+    print(models_w_losses)
 
     return models_w_losses
