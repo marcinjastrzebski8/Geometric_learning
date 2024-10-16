@@ -30,7 +30,7 @@ def model_predictions_for_jit(params, features, encoder, properties):
     """
     encoder_outputs = jnp.array([encoder(params, feat, properties)
                                  for feat in features])
-    
+
     return encoder_outputs, features[1]
 
 
@@ -42,7 +42,7 @@ class Colors(str, Enum):
 
 
 class Trainer(ABC):
-    def __init__(self, 
+    def __init__(self,
                  init_params: np.ndarray,
                  train_size: int = 1,
                  validation_size: int = 1,
@@ -52,9 +52,9 @@ class Trainer(ABC):
                  callbacks: List = [],
                  eval_interval: int = 1,
                  save_dir: str = '',
-                 disable_bar = False
+                 disable_bar=False
                  ):
-        
+
         # TODO: Do all of those need to be attributes?
         self.init_params = init_params
         self.train_size = train_size
@@ -62,7 +62,7 @@ class Trainer(ABC):
         self.k_folds = k_folds
         self.epochs = epochs
         self.batch_size = batch_size
-        self.callbacks =  callbacks
+        self.callbacks = callbacks
         self.save_dir = save_dir
         self.eval_interval = eval_interval
         self.disable_bar = disable_bar
@@ -70,7 +70,8 @@ class Trainer(ABC):
             (self.k_folds, int((self.epochs / self.eval_interval) + 1)), np.inf
         )
         self.k_loss_intervals = np.tile(
-            np.arange(0, self.epochs + 1, self.eval_interval), (self.k_folds, 1)
+            np.arange(0, self.epochs + 1,
+                      self.eval_interval), (self.k_folds, 1)
         )
         self.train_loss_hist = np.zeros((self.k_folds, self.epochs + 1))
         self.train_loss_intervals = np.tile(
@@ -143,7 +144,7 @@ class Trainer(ABC):
 
     def train(
         self,
-        data: Union[Dataset,jdl.Dataset],
+        data: Union[Dataset, jdl.Dataset],
         model_fn: object,
         loss_fn: object,
         optimiser_fn: object,
@@ -198,18 +199,19 @@ class Trainer(ABC):
             self.current_fold = i
             train_ids, val_ids = data.split(
                 self.train_size, self.validation_size)
-            
+
             val_data = jdl.ArrayDataset(*data[val_ids])
             train_data = jdl.ArrayDataset(*data[train_ids])
-            
+
             if self._use_jax:
                 train_loader = jdl.DataLoader(train_data,
                                               backend='jax',
                                               batch_size=int(self.batch_size),
-                                              shuffle = True)
+                                              shuffle=True)
             else:
-                #this seems overly complicated
-                train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+                # this seems overly complicated
+                train_subsampler = torch.utils.data.SubsetRandomSampler(
+                    train_ids)
                 train_loader = DataLoader(
                     train_data,
                     batch_size=int(self.batch_size),
@@ -242,7 +244,6 @@ class Trainer(ABC):
     @abstractmethod
     def train_loop(self, model_fn, train_loader, val_data, loss_fn, optimiser_fn, circuit_properties, use_ray):
         pass
-
 
 
 class TorchQMLTrainer(Trainer):
@@ -290,7 +291,8 @@ class TorchQMLTrainer(Trainer):
             model_fn,
             circuit_properties,
         )
-        #NOTE: not sure what this is used for
+        # NOTE: not sure what this is used for
+
         def metric_fn(p):
             tensor = qml.metric_tensor(model_fn, approx="block-diag")
             return tensor(p, metric_sample_batch, circuit_properties,)  # pylint: disable=not-callable
@@ -368,15 +370,15 @@ class TorchQMLTrainer(Trainer):
         )
 
         if isinstance(optimiser_fn, qml.QNGOptimizer):
-            #pylance suggests this is unreachable but that's probably not true and a case of bad typing
+            # pylance suggests this is unreachable but that's probably not true and a case of bad typing
             update_fn = self.quantum_update
         else:
             update_fn = self.classical_update
 
         params = self.init_params
-        #param_shape = circuit_properties["ansatz_fn"].shape(
+        # param_shape = circuit_properties["ansatz_fn"].shape(
         #    circuit_properties["input_size"], circuit_properties["layers"]
-        #)
+        # )
         # NOTE: I'VE COMMENTED THIS OUT
         # params = weight_init(0, 2 * np.pi, "uniform", param_shape)
         for i in range(self.epochs + 1):
@@ -427,9 +429,9 @@ class JaxTrainer(Trainer):
     """
     Trainer which uses Jax pipeline. 
     """
-    #@jax.jit
+    # @jax.jit
 
-    def __init__(self, 
+    def __init__(self,
                  init_params: np.ndarray,
                  train_size: int = 1,
                  validation_size: int = 1,
@@ -439,7 +441,7 @@ class JaxTrainer(Trainer):
                  callbacks: List = [],
                  eval_interval: int = 1,
                  save_dir: str = '',
-                 disable_bar = False):
+                 disable_bar=False):
 
         super().__init__(init_params,
                          train_size,
@@ -464,32 +466,34 @@ class JaxTrainer(Trainer):
     ):
         """
         TODO: develop this when needing to compare to classical models - will this be much different to quantum update? prolly not
+        I don't even think it'd be different. I just never made a hybrid model using jax.
         """
         pass
-    def quantum_update(self,
-        loss_fn: object,
-        opt_state,#: Callable,
-        model_fn,#: object,
-        sample_batch,#: Sequence,
-        optimiser_fn,#: Sequence,
-        circuit_properties: dict,
-        step_id:int,
-        ):
 
-        #vec_model_fn = jax.vmap(model_fn)
-        def cost_fn(p): 
+    def quantum_update(self,
+                       loss_fn: object,
+                       opt_state,  # : Callable,
+                       model_fn,  # : object,
+                       sample_batch,  # : Sequence,
+                       optimiser_fn,  # : Sequence,
+                       circuit_properties: dict,
+                       step_id: int,
+                       ):
+
+        # vec_model_fn = jax.vmap(model_fn)
+        def cost_fn(p):
             return loss_fn(
-            p,
-            sample_batch,
-            model_fn,
-            circuit_properties,
-        )
-        
+                p,
+                sample_batch,
+                model_fn,
+                circuit_properties,
+            )
+
         opt_init, opt_update, get_params = optimiser_fn
         net_params = get_params(opt_state)
         loss, grads = jax.value_and_grad(cost_fn)(net_params)
         return opt_update(step_id, grads, opt_state), loss
-    
+
     def update_logs(
             self, i: int, params: qnp.ndarray, loss: float, performance_log: tqdm  # pylint: disable=no-member
     ):
@@ -521,11 +525,10 @@ class JaxTrainer(Trainer):
         val_data: np.ndarray,
         circuit_properties: dict,
     ) -> float:
-        
         """
         Same as TorchQMLTrainer but data not passed as qnp.array
         """
-        
+
         loss = loss_fn(params, val_data[:][0], model, circuit_properties)
 
         return loss
@@ -547,23 +550,22 @@ class JaxTrainer(Trainer):
 
         opt_init, opt_update, get_params = optimiser_fn
         opt_state = opt_init(self.init_params)
-        #NOTE these are the same as in TorchQMLTrainer
-        #outer what exactly
-        outer = tqdm(total = self.epochs, 
-                    desc = "Epoch",
-                    position=2,
-                    leave=False,
-                    disable=self.disable_bar,
-                    ascii = " -"
-                    )
-        
+        # NOTE these are the same as in TorchQMLTrainer
+        # outer what exactly
+        outer = tqdm(total=self.epochs,
+                     desc="Epoch",
+                     position=2,
+                     leave=False,
+                     disable=self.disable_bar,
+                     ascii=" -"
+                     )
+
         performance_log = tqdm(
             total=0,
             position=3,
             bar_format="{desc}",
             leave=False,
             disable=self.disable_bar)
-        
 
         for epoch_id in range(self.epochs + 1):
             inner = tqdm(
@@ -585,7 +587,7 @@ class JaxTrainer(Trainer):
                     optimiser_fn,
                     circuit_properties,
                     step_id,
-                    )
+                )
                 if use_ray:
                     with tempfile.TemporaryDirectory() as tempdir:
                         self.save_params(self.best_params, tempdir)
@@ -597,23 +599,26 @@ class JaxTrainer(Trainer):
 
             if epoch_id % self.eval_interval == 0:
                 loss = self.validate(
-                    model_fn, loss_fn, get_params(opt_state), val_data, circuit_properties
+                    model_fn, loss_fn, get_params(
+                        opt_state), val_data, circuit_properties
                 )
 
-                self.update_logs(epoch_id, get_params(opt_state), loss, performance_log)
+                self.update_logs(epoch_id, get_params(
+                    opt_state), loss, performance_log)
 
                 self.val_loss_histories[
                     self.current_fold, int(epoch_id / self.eval_interval)
                 ] = loss
 
         return get_params(opt_state)
-    
+
 
 class JaxTrainerJit(Trainer):
     """
     Trainer which uses Jax pipeline which I want to make compatible with jitting.
     """
-    def __init__(self, 
+
+    def __init__(self,
                  init_params: np.ndarray,
                  train_size: int = 1,
                  validation_size: int = 1,
@@ -623,7 +628,7 @@ class JaxTrainerJit(Trainer):
                  callbacks: List = [],
                  eval_interval: int = 1,
                  save_dir: str = '',
-                 disable_bar = False):
+                 disable_bar=False):
 
         super().__init__(init_params,
                          train_size,
@@ -650,32 +655,33 @@ class JaxTrainerJit(Trainer):
         TODO: develop this when needing to compare to classical models - will this be much different to quantum update? prolly not
         """
         pass
+
     def quantum_update(self,
-        loss_fn: object,
-        opt_state,#: Callable,
-        model_fn,#: object,
-        sample_batch,#: Sequence,
-        optimiser_fn,#: Sequence,
-        circuit_properties: dict,
-        step_id:int,
-        ):
+                       loss_fn: object,
+                       opt_state,  # : Callable,
+                       model_fn,  # : object,
+                       sample_batch,  # : Sequence,
+                       optimiser_fn,  # : Sequence,
+                       circuit_properties: dict,
+                       step_id: int,
+                       ):
 
-        #vec_model_fn = jax.vmap(model_fn)
+        # vec_model_fn = jax.vmap(model_fn)
 
-        #NOTE: at the moment this is the only bit that I think I can jit
-        #the jitting does not happen here, the loss function passed has to be decorated with jit
-        #the only thing changed here is the functionality is split compared to the non-jitted implementation
-        def cost_fn(params): 
-            outputs, targets = model_predictions_for_jit(params, sample_batch, model_fn, circuit_properties)
+        # NOTE: at the moment this is the only bit that I think I can jit
+        # the jitting does not happen here, the loss function passed has to be decorated with jit
+        # the only thing changed here is the functionality is split compared to the non-jitted implementation
+        def cost_fn(params):
+            outputs, targets = model_predictions_for_jit(
+                params, sample_batch, model_fn, circuit_properties)
 
             return loss_fn(outputs, targets)
-        
 
         opt_init, opt_update, get_params = optimiser_fn
         net_params = get_params(opt_state)
         loss, grads = jax.value_and_grad(cost_fn)(net_params)
         return opt_update(step_id, grads, opt_state), loss
-    
+
     def update_logs(
             self, i: int, params: qnp.ndarray, loss: float, performance_log: tqdm  # pylint: disable=no-member
     ):
@@ -707,11 +713,11 @@ class JaxTrainerJit(Trainer):
         val_data: np.ndarray,
         circuit_properties: dict,
     ) -> float:
-        
         """
         Same as TorchQMLTrainer but data not passed as qnp.array
         """
-        outputs, targets = model_predictions_for_jit(params, val_data[:][0], model, circuit_properties)
+        outputs, targets = model_predictions_for_jit(
+            params, val_data[:][0], model, circuit_properties)
         loss = loss_fn(outputs, targets)
 
         return loss
@@ -733,23 +739,22 @@ class JaxTrainerJit(Trainer):
 
         opt_init, opt_update, get_params = optimiser_fn
         opt_state = opt_init(self.init_params)
-        #NOTE these are the same as in TorchQMLTrainer
-        #outer what exactly
-        outer = tqdm(total = self.epochs, 
-                    desc = "Epoch",
-                    position=2,
-                    leave=False,
-                    disable=self.disable_bar,
-                    ascii = " -"
-                    )
-        
+        # NOTE these are the same as in TorchQMLTrainer
+        # outer what exactly
+        outer = tqdm(total=self.epochs,
+                     desc="Epoch",
+                     position=2,
+                     leave=False,
+                     disable=self.disable_bar,
+                     ascii=" -"
+                     )
+
         performance_log = tqdm(
             total=0,
             position=3,
             bar_format="{desc}",
             leave=False,
             disable=self.disable_bar)
-        
 
         for epoch_id in range(self.epochs + 1):
             inner = tqdm(
@@ -771,7 +776,7 @@ class JaxTrainerJit(Trainer):
                     optimiser_fn,
                     circuit_properties,
                     step_id,
-                    )
+                )
                 if use_ray:
                     with tempfile.TemporaryDirectory() as tempdir:
                         self.save_params(self.best_params, tempdir)
@@ -783,14 +788,15 @@ class JaxTrainerJit(Trainer):
 
             if epoch_id % self.eval_interval == 0:
                 loss = self.validate(
-                    model_fn, loss_fn, get_params(opt_state), val_data, circuit_properties
+                    model_fn, loss_fn, get_params(
+                        opt_state), val_data, circuit_properties
                 )
 
-                self.update_logs(epoch_id, get_params(opt_state), loss, performance_log)
+                self.update_logs(epoch_id, get_params(
+                    opt_state), loss, performance_log)
 
                 self.val_loss_histories[
                     self.current_fold, int(epoch_id / self.eval_interval)
                 ] = loss
 
         return get_params(opt_state)
-    

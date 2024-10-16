@@ -11,7 +11,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import argparse
 import json
-# TODO: UPDATE TO REFLECT DIFFERENT STRUCTURE WHEN USING PRECOMPUTED BANK TWIRLING
 
 
 def construct_gate_instructions(best_config, run_with_errors=False, model_name=None):
@@ -88,10 +87,10 @@ def validate_ray_models(json_config, n_models_to_keep, geo_classifier_implementa
             model = GeometricClassifierAutotwirlJax('RotEmbedding', 'GeneralCascadingAnsatz', n_wires,
                                                     best_config['twirled_bool'], c4_rep_on_qubits, group_commuting_meas, image_size=image_size)
         elif geo_classifier_implementation == 'precomputed_bank':
-            run_with_errors = json_config['output_models_dir'] == '3x3_geo_precomputed_bank_method'
             # first run had an error - some info was not saved
-            if run_with_errors:
-                model_name = model_name_and_loss[0]
+            run_with_errors = json_config['output_models_dir'] == '3x3_geo_precomputed_bank_method'
+
+            model_name = model_name_and_loss[0]
             gate_1local_instructions, gate_2local_instructions = construct_gate_instructions(
                 best_config, run_with_errors, model_name)
 

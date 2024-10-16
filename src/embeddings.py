@@ -6,6 +6,7 @@ They can but don't need to have trainable parameters.
 import numpy as np
 import pennylane as qml
 from pennylane.operation import Operation, AnyWires
+from typing import Any
 
 
 class RXEmbedding(Operation):
@@ -71,10 +72,10 @@ class RotEmbedding(Operation):
         super().__init__(params, wires)
 
     @staticmethod
-    def compute_decomposition(*params, wires=None, **hyperaprameters):
+    def compute_decomposition(params: Any, wires: Any | None = None, **hyperparameters: Any) -> list:
         op_list = []
         wires = qml.wires.Wires(wires)
         for qubit_id, wire in enumerate(wires):
-            op_list.append(hyperaprameters['embedding_pauli'](
-                params[0][qubit_id], wires=wire))
+            op_list.append(hyperparameters['embedding_pauli'](
+                params[:, qubit_id], wires=wire))
         return op_list

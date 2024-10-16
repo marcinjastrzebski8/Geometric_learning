@@ -7,10 +7,10 @@ import pennylane as qml
 from typing import Sequence
 
 
-#NOTE: when the Operation class is called via its init, it uses compute_decomposition implicitly
+# NOTE: when the Operation class is called via its init, it uses compute_decomposition implicitly
 class GeometricClassifierAutotwirlJax():
     """
-    Generic classifier which uses jax. Has the option to twirl the ansatz. 
+    Generic classifier which uses jax. Has the option to twirl the ansatz.
     Note that tiwrled ansatz isn't enough for the whole model to be equivariant/invariant.
 
     This version of the classifier uses my first attempt at twirling which is very general
@@ -55,21 +55,22 @@ class GeometricClassifierAutotwirlJax():
 
 class BasicClassifier():
     """
-    Classifier with a basic 
-    |0> -/- feature_map -/- ansatz -/- measurement 
+    Classifier with a basic
+    |0> -/- feature_map -/- ansatz -/- measurement
     structure.
     """
 
-    def __init__(self, feature_map: str, ansatz, size: int, measurement=None):
+    def __init__(self, feature_map: str, ansatz, size: int, measurement=None, interface='jax'):
         self.feature_map = circuit_dict[feature_map]
         self.ansatz = ansatz
         self.size = size
         self.device = qml.device('default.qubit.jax', wires=self.size)
         self.measurement = measurement
+        self.interface = interface
 
     def prediction_circuit(self, params, features, properties):
 
-        @qml.qnode(self.device, interface='jax')
+        @qml.qnode(self.device, interface=self.interface)
         def qnode(params, features):
             # feature map
             self.feature_map(features, list(range(self.size)), properties)
@@ -79,3 +80,33 @@ class BasicClassifier():
 
             return qml.expval(self.measurement)
         return qnode(params, features)
+
+
+class BasicClassifierTorch():
+    """
+    Same as BasicClassifier but few minor changes to be compatible with pytorch/pennylane interface.
+    """
+
+    def __init__(self, feature_map: str, ansatz, size: int, measurement=qml.PauliZ(0)):
+        self.feature_map = circuit_dict[feature_map]
+        self.ansatz = ansatz
+        self.size = size
+        # device changed from jax
+        self.device = qml.device('default.qubit', wires=self.size)
+        self.measurement = measurement
+
+    def prediction_circuit(self, properties):
+
+        @qml.qnode(self.device)
+        def qnode(inputs, params):
+            """
+            first parameter to qnode needs to be called 'inputs' for compatibility with torch
+            """
+            # feature map
+            self.feature_map(inputs, list(range(self.size)), properties)
+
+            # ansatz
+            self.ansatz(params, list(range(self.size)), properties)
+            return qml.expval(self.measurement)
+        # output changed to just the function, not the function call
+        return qnode
