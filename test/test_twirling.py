@@ -1,7 +1,7 @@
 from pennylane import numpy as qnp
 import pennylane as qml
-from src.twirling import twirl, twirl_an_ansatz, some_simple_group, C4On9QEquivGate2Local, C4On9QEquivGate1Local, c4_rep_on_qubits
-from src.ansatze import HardcodedTwirledSimpleAnsatz0, SimpleAnsatz0
+from twirling import twirl, twirl_an_ansatz, some_simple_group, C4On9QEquivGate2Local, C4On9QEquivGate1Local, c4_rep_on_qubits
+from ansatze import HardcodedTwirledSimpleAnsatz0, SimpleAnsatz0
 import pytest
 import itertools
 

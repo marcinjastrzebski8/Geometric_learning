@@ -1,9 +1,9 @@
-from src.geometric_classifier import GeometricClassifierAutotwirlJax, BasicClassifier
+from geometric_classifier import GeometricClassifierAutotwirlJax, BasicClassifier
 from pennylane import numpy as qnp
 import pennylane as qml
-from src.twirling import twirl_an_ansatz, some_simple_group, c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
-from src.embeddings import RXEmbeddingWEnt
-from src.ansatze import SimpleAnsatz0, GeometricAnsatzConstructor
+from twirling import twirl_an_ansatz, some_simple_group, c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
+from embeddings import RXEmbeddingWEnt
+from ansatze import SimpleAnsatz0, GeometricAnsatzConstructor
 import pytest
 import sys
 import os

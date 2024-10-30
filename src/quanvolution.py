@@ -10,14 +10,60 @@ import pennylane as qml
 from typing import Sequence
 import torch
 import functools
+from copy import deepcopy
 
 
-def create_structured_patches(patches_to_convolve):
-    # TODO: this function rotates the patches which will be processed by quantum filter
-    # in the usual formulation of the quanvolution, it is the filter that rotates
-    # but we can't really do so with a quantum filter (we're not really doing a convolution)
-    # I think that rotating the filters in the opposite direction achieves the same result
-    return patches_to_convolve
+def cyclic_permute(tensor, shift):
+    """
+    From chatgpt, used in create_structured_patches.
+    """
+    indices = [(i + shift) % tensor.shape[0] for i in range(tensor.shape[0])]
+    return tensor[indices]
+
+
+def create_structured_patches(patches_to_convolve, patch_size=3):
+    """
+    Creates *poses* of the patches to convolve.
+
+    Takes a tensor of shape (batch_size*number_of_patches_in_image, prod(kernel_sizes))
+    with output of shape (|G|_out, batch_size*number_of_patches_in_image, prod(kernel_sizes))
+    OR
+    Takes a tensor of shape (|G|_in, batch_size*number_of_patches_in_image, , prod(kernel_sizes))
+    with output of shape (|G|_in,|G|_out, batch_size*number_of_patches_in_image, prod(kernel_sizes))
+    where |G|_out is the size of the group and hence len(patch_transformations).
+    NOTE: FOR NOW ONLY ROTATIONS SUPPORTED (EASY WITH TORCH)
+    TODO: IMPLEMENT SUCH THAT
+        The transformations need to be passed as a list of functions, in the order in which they appear in the group. 
+        The transformations will be applied to the patches BACKWARDS to achieve the same effect as when acting on the 'quantum filters'.
+
+    """
+    input_patches_dims = deepcopy(patches_to_convolve.shape)
+    print(input_patches_dims)
+    # need to un-flatten last dimension to rotate it
+    patches_to_convolve = patches_to_convolve.view(
+        *input_patches_dims[:-1], patch_size, patch_size)
+    rotation_patches_dims = patches_to_convolve.shape
+
+    # what is this
+    structured_patches_to_convolve = torch.zeros(4, *rotation_patches_dims)
+
+    print('GETTING SHAPE ', patches_to_convolve.shape)
+    for n_rotations in range(4):
+        rotated_patches = patches_to_convolve.rot90(
+            range(4)[-n_rotations], tuple(range(len(rotation_patches_dims))[-2:]))
+        if len(rotation_patches_dims) == 3:
+            structured_patches_to_convolve[n_rotations,
+                                           :, :, :] = rotated_patches
+        else:
+            rotated_patches = cyclic_permute(rotated_patches, n_rotations)
+            structured_patches_to_convolve[:,
+                                           n_rotations, :, :, :] = rotated_patches
+            # rearrange such that it can be passed to the torch layer effectively
+            # a single filter sees all patches belonging to (i,i) pairs where the first coordinate is
+            # in the input component space and the second is in group basis
+            # TODO: HERE, NEED TO REARRANGE. GOT ALL NECESSARY PATCHES BUT THEY NEED TO BE IN CORRECT ORDER
+            # LEADING DIMENSION NEEDS TO BE THE FILTER - WHICH IS NOT A DIMENSION THAT EXISTS AT THE MOMENT
+    return structured_patches_to_convolve
 
 
 class Quanvolution2DTorchLayer(nn.Module):
@@ -124,8 +170,6 @@ class Quanvolution2DTorchLayer(nn.Module):
 
 class EquivariantQuanvolution2DTorchLayer(nn.Module):
     """
-
-    TODO: KEEP DEVVING
     Equivariant convolutional layer with filters being quantum circuits.
 
     quantum_circs: List of circuit class objects (I don't have a common base class yet)
@@ -168,23 +212,31 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
         print('OUTPUT SIZE:', self.h_iter, self.w_iter)
         # the circuits qnodes
-        quantum_filters = [quantum_circ.prediction_circuit(
-            quantum_circ_properties) for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
-        # qnodes turned into torch layers MAYBE NOT THE BEST NAME?
-        self.torch_layers = [qml.qnn.TorchLayer(
-            quantum_filter, weight_shapes, init_method=init_method) for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
+        if self.is_first_layer_quanv:
+            quantum_filters = [quantum_circ.prediction_circuit(
+                quantum_circ_properties) for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
+            # qnodes turned into torch layers MAYBE NOT THE BEST NAME?
+            self.torch_layers = [qml.qnn.TorchLayer(
+                quantum_filter, weight_shapes, init_method=init_method) for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
+        else:
+            # this is a bit messy...
+            quantum_filters = [
+                [quantum_circ.prediction_circuit(quantum_circ_properties) for i in range(self.group['size'])] for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
+            self.torch_layers = [[qml.qnn.TorchLayer(
+                quantum_filter[i], weight_shapes, init_method=init_method) for i in range(self.group['size'])] for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
+
         self.bias = nn.Parameter(torch.ones(len(self.torch_layers))*0.1)
 
     def quantum_convolution(self, input_channel, torch_layer):
         """
         Quantum circuit which can act as the convolutional filter.
-        Input_channel is a set of patches for a single input channel for all data points,
-        shape: (batch_size, prod(kernel_sizes), h_iter*w_iter)
-        Output is a single channel of a batch (so a (batch_size, h_iter, w_iter)-array)
+        Input_channel is a set of patches for all of the poses of a single input channel for all data points,
+        shape: (batch_size, |G|, prod(kernel_sizes), h_iter*w_iter) [subsequent layers]
+        OR a set of patches of a single input channel for all data points [first layer]
+        Output is a single channel (so a (batch_size, |G|, h_iter*w_iter)-shaped tensor).
+        Torch layer is a TorchLayer object or Sequence[TorchLayer], if self.is_first_layer = True/False
         """
 
-        # TODO: DEVVING HERE - TWO CASES: FIRST LAYER AND SUBSEQUENT LAYER
-        # IN EACH CASE NEED TO APPLY THE FILTER |G| TIMES, EACH TIME ACTED ON WITH THE CORRECT GROUP ACTION
         # NOTE THAT WE CAN'T 'ROTATE' THE CIRCUIT BECAUSE IT'S NOT A FUNCTION OF GROUP ELEMENTS
         # WE CAN INSTEAD ROTATE THE SELECTED PATCH OF FEATURE MAP BUT I THINK YOU NEED TO DO IT BACKWARDS
 
@@ -193,24 +245,38 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
             # each data point split into the different patches we'll be convolving over
             # permuting to have the input to a circuit be a single patch values
-
             patches_to_convolve = input_channel.permute(
-                0, 2, 1).reshape(-1, self.kernel_sizes[0]*self.kernel_sizes[1])
+                0, 2, 1).reshape(-1,  np.prod(self.kernel_sizes))
 
-            # TODO: this function should return |G|*n_patches patches where n_patches is the -1 in above reshape
+            # this creates patches which are equivalent to 'rotating the filter'
+            # but this way we can reuse the same circuit multiple times (also can't really rotate circuit anyways)
             rotated_patches_to_convolve = create_structured_patches(
-                patches_to_convolve)
+                patches_to_convolve).view(-1, np.prod(self.kernel_sizes))
+            print('SHAPE OF ROTATED PATCHES IS: ',
+                  rotated_patches_to_convolve.shape)
 
-            # NOTE: extra dimension coming from pixels being vector-valued [separate to possible multiple input channels]
-            output = torch_layer(rotated_patches_to_convolve).view(-1, self.group.size,
-                                                                   self.h_iter*self.w_iter)
+            output = torch_layer(
+                rotated_patches_to_convolve).view(self.group['size'], -1, self.h_iter*self.w_iter)
         # in case this layer is already receiving a function on a compound group (output of first and subsequent layers)
         else:
-            # data has shape (batch_size, prod(kernel_sizes), |G|, h_iter*w_iter)
-            # thus filters should be in a square matrix (|G|, |G|)
-            for pose_id in range(self.group.size):
-                torch_layer[pose_id]
-            pass
+            # data has shape (|G|, batch_size, prod(kernel_sizes), h_iter*w_iter)
+            batch_size = input_channel.shape[1]
+            print('batch_size: ', batch_size)
+            patches_to_convolve = input_channel.permute(
+                0, 1, 3, 2).reshape(self.group['size'], -1, np.prod(self.kernel_sizes))
+
+            rotated_patches_to_convolve = create_structured_patches(
+                patches_to_convolve).view(self.group['size'], -1, np.prod(self.kernel_sizes))
+
+            # applies the correct filter pose to the correct input channel pose
+            # then sums to obtain full output for a single pose
+            output = torch.zeros(
+                self.group['size'], batch_size, self.h_iter*self.w_iter)
+
+            for input_component_id in range(self.group['size']):
+                outputs_from_filter = torch_layer[input_component_id](
+                    rotated_patches_to_convolve[input_component_id]).view(self.group['size'], -1, self.h_iter*self.w_iter)
+                output += outputs_from_filter
 
         return output
 
@@ -218,33 +284,65 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
         """
         A pass through one layer of convolution using quantum filters.
         Expects input of shape (batch_size, n_input_channels, base_space_height, base_space_width)
-        Output is of shape (batch_size, n_input_channels, h_iter, w_iter)
+        OR (|G|, batch_size, n_input_channels,  base_space_height, base_space_width)
+        Output is of shape (|G|, batch_size, n_input_channels, h_iter, w_iter)
         """
-        batch_size, n_input_channels = input_channels.shape[:2]
+        # TODO: the shapes could be handled better
+        if self.is_first_layer_quanv:
+            batch_size, n_input_channels = input_channels.shape[:2]
+        else:
+            batch_size, n_input_channels = input_channels.shape[1:3]
         print('INPUT CHANNELS SHAPE ', input_channels.shape)
+
+        if not self.is_first_layer_quanv:
+            # temporarily permute and flatten the group dimension along the input_channel dimension to allow unfolding
+            input_channels = input_channels.permute(1, 0, 2, 3, 4).reshape(
+                batch_size, n_input_channels*self.group['size'], input_channels.shape[3], input_channels.shape[4])
+
         # this extracts (batch_size, n_input_channels*prod(kernel_sizes), h_iter*w_iter)
         input_channels_unfolded = torch.nn.functional.unfold(
             input_channels, kernel_size=self.kernel_sizes, stride=self.strides)
         print('UNFOLDED: ', input_channels_unfolded.shape)
-        # this separates the input channels
-        input_channels_unfolded = input_channels_unfolded.view(
-            batch_size, n_input_channels, np.prod(self.kernel_sizes), self.h_iter*self.w_iter)
 
-        output = torch.zeros(batch_size, len(
-            self.torch_layers), self.h_iter, self.w_iter)
+        # this separates the input channels
+        if self.is_first_layer_quanv:
+            unfolded_shape = (
+                batch_size, n_input_channels, np.prod(self.kernel_sizes), self.h_iter*self.w_iter)
+        else:
+            unfolded_shape = (batch_size, self.group['size'], n_input_channels,  np.prod(
+                self.kernel_sizes), self.h_iter*self.w_iter)
+
+        input_channels_unfolded = input_channels_unfolded.view(
+            unfolded_shape)
+
+        if not self.is_first_layer_quanv:
+            input_channels_unfolded = input_channels_unfolded.permute(
+                1, 0, 2, 3, 4)
+
+        # this common regardless of input shape
+        output = torch.zeros(self.group['size'], batch_size, len(
+            self.torch_layers),  self.h_iter, self.w_iter)
 
         # Filter iteration
         for filter_id, torch_layer in enumerate(self.torch_layers):
 
-            filter_output = torch.zeros(batch_size, self.h_iter*self.w_iter)
+            filter_output = torch.zeros(
+                self.group['size'], batch_size, self.h_iter*self.w_iter)
+            print('FILTER OUTPUT SHAPE:', filter_output.shape)
             # Input channel iteration
             for input_channel_id in range(n_input_channels):
 
-                channel_output = self.quantum_convolution(input_channels_unfolded[:, input_channel_id, :, :,],
-                                                          torch_layer)
+                if self.is_first_layer_quanv:
+                    channel_output = self.quantum_convolution(input_channels_unfolded[:, input_channel_id, :, :,],
+                                                              torch_layer)
+                    print('CHANNEL OUTPUT SHAPE:', channel_output.shape)
+                else:
+                    channel_output = self.quantum_convolution(input_channels_unfolded[:, :, input_channel_id, :, :,],
+                                                              torch_layer)
                 filter_output = filter_output + channel_output
-            output[:, filter_id, :, :] = filter_output.view(
-                batch_size, self.h_iter, self.w_iter)
+            output[:, :, filter_id, :, :] = filter_output.view(
+                self.group['size'], batch_size, self.h_iter, self.w_iter)
+        # TODO: THINK THIS WILL NEED CHANGING
         output = output + self.bias.view(1, len(self.torch_layers), 1, 1)
 
         return output
