@@ -85,15 +85,16 @@ class BasicClassifier():
 class BasicClassifierTorch():
     """
     Same as BasicClassifier but few minor changes to be compatible with pytorch/pennylane interface.
+    NOTE: expanded to allow for reuploading circuits. Should reflect in name. Need to check if works.
     """
 
-    def __init__(self, feature_map: str, ansatz, size: int, measurement=qml.PauliZ(0)):
+    def __init__(self, feature_map: str, ansatz, size: int, measurement=qml.PauliZ(0), n_reuploads: int = 1):
         self.feature_map = circuit_dict[feature_map]
         self.ansatz = ansatz
         self.size = size
-        # device changed from jax
         self.device = qml.device('default.qubit', wires=self.size)
         self.measurement = measurement
+        self.n_reuploads = n_reuploads
 
     def prediction_circuit(self, properties):
 
@@ -102,11 +103,13 @@ class BasicClassifierTorch():
             """
             first parameter to qnode needs to be called 'inputs' for compatibility with torch
             """
-            # feature map
-            self.feature_map(inputs, list(range(self.size)), properties)
+            for reupload_id in range(self.n_reuploads):
+                # feature map
+                self.feature_map(inputs, list(range(self.size)), properties)
 
-            # ansatz
-            self.ansatz(params, list(range(self.size)), properties)
+                # ansatz
+                self.ansatz(params[reupload_id], list(
+                    range(self.size)), properties)
             return qml.expval(self.measurement)
         # output changed to just the function, not the function call
         return qnode

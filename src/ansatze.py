@@ -23,10 +23,12 @@ class SimpleAnsatz0(Operation):
     @staticmethod
     def compute_decomposition(*params, wires=None, **hyperparameters):
         op_list = []
+        # the unpacking adds an extra dimension which is spurious
+        params = params[0]
         wires = qml.wires.Wires(wires)
         for l in range(hyperparameters['n_layers']):
             for i, wire in enumerate(wires):
-                op_list.append(qml.RY(params[0][l][i], wires=wire))
+                op_list.append(qml.RY(params[l][i], wires=wire))
 
         return op_list
 
@@ -50,16 +52,47 @@ class SimpleAnsatz1(Operation):
     def compute_decomposition(*params, wires=None, **hyperparameters):
         op_list = []
         wires = qml.wires.Wires(wires)
-        for l in range(hyperparameters['n_layers']):
+        n_layers = hyperparameters['n_layers']
+        # the unpacking adds an extra dimension which is spurious
+        params = params[0]
+        for l in range(n_layers):
             for i, wire in enumerate(wires):
                 op_list.append(qml.Hadamard(wires=wire))
-                op_list.append(qml.RY(params[0][l][i], wires=wire))
+                op_list.append(qml.RY(params[l][i], wires=wire))
                 if i == len(wires)-1:
                     op_list.append(qml.PauliRot(
-                        params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[0]]))
+                        params[l][len(wires)+i], pauli_word='YY', wires=[wire, wires[0]]))
                 else:
                     op_list.append(qml.PauliRot(
-                        params[0][l][len(wires)+i], pauli_word='YY', wires=[wire, wires[i+1]]))
+                        params[l][len(wires)+i], pauli_word='YY', wires=[wire, wires[i+1]]))
+
+        return op_list
+
+
+class MatchCallumAnsatz(Operation):
+    """
+    Seems slightly different to any other simple ansatz I've got so far and want to match Callum exactly.
+    TODO: FIGURE OUT WHAT ANSATZ BLOCK IS MEANT TO BE. I'M GUESSING ANY SEQUENCE OF GATES THAT GOES ON A SINGLE QUBIT.
+    """
+
+    def __init__(self, params, wires=None, config=None):
+        self._hyperparameters = {'n_layers': config['n_layers']}
+        super().__init__(params, wires)
+
+    @staticmethod
+    def shape(n_wires, layers):
+        return layers, n_wires
+
+    @staticmethod
+    def compute_decomposition(*params, wires=None, **hyperparameters):
+        op_list = []
+        wires = qml.wires.Wires(wires)
+        for j in range(hyperparameters['n_layers']):
+            for k, wire in enumerate(wires):
+                for a_i, a in enumerate(hyperparameters['ansatz_block']):
+                    op_list.append(a(params[j][k][a_i]), wires=wire)
+                if k != len(wires)-1:
+                    qml.CNOT(wires=[k, k+1])
 
         return op_list
 

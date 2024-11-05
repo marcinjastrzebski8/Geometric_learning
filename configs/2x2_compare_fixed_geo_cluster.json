@@ -1,8 +1,0 @@
-{
-    "n_cpus": 4,
-    "n_cpus_per_model":1,
-    "n_models": 200,
-    "output_models_dir": "2x2_compare_fixed_geo",
-    "local_model_save_dir": "models_save_dir/2x2_compare_fixed_geo",
-    "image_size": 2
-}

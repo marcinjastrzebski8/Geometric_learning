@@ -24,6 +24,8 @@ def cyclic_permute(tensor, shift):
 def create_structured_patches(patches_to_convolve, patch_size=3):
     """
     Creates *poses* of the patches to convolve.
+    Output such that structured_patches_to_convolve[i] contains patches which can all be passed to a single filter in the convolution.
+
 
     Takes a tensor of shape (batch_size*number_of_patches_in_image, prod(kernel_sizes))
     with output of shape (|G|_out, batch_size*number_of_patches_in_image, prod(kernel_sizes))
@@ -44,7 +46,6 @@ def create_structured_patches(patches_to_convolve, patch_size=3):
         *input_patches_dims[:-1], patch_size, patch_size)
     rotation_patches_dims = patches_to_convolve.shape
 
-    # what is this
     structured_patches_to_convolve = torch.zeros(4, *rotation_patches_dims)
 
     print('GETTING SHAPE ', patches_to_convolve.shape)
@@ -58,11 +59,6 @@ def create_structured_patches(patches_to_convolve, patch_size=3):
             rotated_patches = cyclic_permute(rotated_patches, n_rotations)
             structured_patches_to_convolve[:,
                                            n_rotations, :, :, :] = rotated_patches
-            # rearrange such that it can be passed to the torch layer effectively
-            # a single filter sees all patches belonging to (i,i) pairs where the first coordinate is
-            # in the input component space and the second is in group basis
-            # TODO: HERE, NEED TO REARRANGE. GOT ALL NECESSARY PATCHES BUT THEY NEED TO BE IN CORRECT ORDER
-            # LEADING DIMENSION NEEDS TO BE THE FILTER - WHICH IS NOT A DIMENSION THAT EXISTS AT THE MOMENT
     return structured_patches_to_convolve
 
 
@@ -190,8 +186,10 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                  input_channel_shape: tuple,
                  stride,
                  kernel_size,
-                 weight_shapes_list: Sequence[dict]):
+                 weight_shapes_list: Sequence[dict],
+                 weights_init_max_val: float = 2 * math.pi):
         super().__init__()
+        # for now this is just a dictionary with very minimal information - group size
         self.group = group
         self.is_first_layer_quanv = is_first_layer_quanv
         self.input_channel_shape = input_channel_shape
@@ -201,7 +199,7 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
             kernel_size, int) else kernel_size
         # TODO: ALLOW FOR SOME USER INPUT
         init_method = functools.partial(
-            torch.nn.init.uniform_, b=2 * math.pi)
+            torch.nn.init.uniform_, b=weights_init_max_val)
 
         # Calculate the number of convolution iterations
         # TODO: THIS DOESNT SUPPORT PADDING
@@ -250,8 +248,9 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
             # this creates patches which are equivalent to 'rotating the filter'
             # but this way we can reuse the same circuit multiple times (also can't really rotate circuit anyways)
+            # NOTE: assumes square kernel
             rotated_patches_to_convolve = create_structured_patches(
-                patches_to_convolve).view(-1, np.prod(self.kernel_sizes))
+                patches_to_convolve, self.kernel_sizes[0]).view(-1, np.prod(self.kernel_sizes))
             print('SHAPE OF ROTATED PATCHES IS: ',
                   rotated_patches_to_convolve.shape)
 
@@ -264,9 +263,9 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
             print('batch_size: ', batch_size)
             patches_to_convolve = input_channel.permute(
                 0, 1, 3, 2).reshape(self.group['size'], -1, np.prod(self.kernel_sizes))
-
+            # NOTE: assumes square kernel
             rotated_patches_to_convolve = create_structured_patches(
-                patches_to_convolve).view(self.group['size'], -1, np.prod(self.kernel_sizes))
+                patches_to_convolve, self.kernel_sizes[0]).view(self.group['size'], -1, np.prod(self.kernel_sizes))
 
             # applies the correct filter pose to the correct input channel pose
             # then sums to obtain full output for a single pose
@@ -321,7 +320,7 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
         # this common regardless of input shape
         output = torch.zeros(self.group['size'], batch_size, len(
-            self.torch_layers),  self.h_iter, self.w_iter)
+            self.torch_layers), self.h_iter, self.w_iter)
 
         # Filter iteration
         for filter_id, torch_layer in enumerate(self.torch_layers):
@@ -342,7 +341,7 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                 filter_output = filter_output + channel_output
             output[:, :, filter_id, :, :] = filter_output.view(
                 self.group['size'], batch_size, self.h_iter, self.w_iter)
-        # TODO: THINK THIS WILL NEED CHANGING
+
         output = output + self.bias.view(1, len(self.torch_layers), 1, 1)
 
         return output

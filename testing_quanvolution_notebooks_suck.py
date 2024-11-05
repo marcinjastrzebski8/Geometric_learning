@@ -8,6 +8,7 @@ For now this is just for first-layer equivariance.
 
 import numpy as np
 import torch
+from torch import nn
 import matplotlib.pyplot as plt
 import functools
 import pennylane as qml
@@ -38,15 +39,16 @@ dummy_filters = torch.rand(4, 9)
 init_method = functools.partial(
     torch.nn.init.uniform_, b=2 * math.pi)
 n_layers = 6
+n_reuploads = 1
 weight_shapes_list = [
-    {'params': (n_layers, n_layers*18)}, {'params': (n_layers, n_layers*9)}]
+    {'params': (n_reuploads, n_layers, 18)}, {'params': (n_reuploads, n_layers, 9)}]
 
 # trying out using multiple filters
 quantum_circs = [
     BasicClassifierTorch(
-        feature_map='RotEmbeddingWEnt', ansatz=SimpleAnsatz1, size=9, measurement=qml.PauliZ(4)),
+        feature_map='RotEmbeddingWEnt', ansatz=SimpleAnsatz1, size=9),
     BasicClassifierTorch(
-        feature_map='RotEmbeddingWEnt', ansatz=SimpleAnsatz0, size=9, measurement=qml.PauliZ(4)),
+        feature_map='RotEmbeddingWEnt', ansatz=SimpleAnsatz0, size=9),
 ]
 quantum_circs_properties = [{'n_layers': n_layers, 'embedding_pauli': RY}, {
     'n_layers': n_layers-4, 'embedding_pauli': RX}]
@@ -66,16 +68,16 @@ temp_subsequent_layer = [qml.qnn.TorchLayer(
 ####################################################################################################
 
 # imagine dataset with two datapoints that happen to be related by a rotation
-datapoint_e = torch.range(1, 729).view(27, 27)/729
-# datapoint_e = torch.rand(27, 27)
+# datapoint_e = torch.range(1, 729).view(27, 27)/729
+datapoint_e = torch.rand(27, 27)
 datapoint_r = datapoint_e.rot90(1, (0, 1))
 datapoint_r2 = datapoint_e.rot90(2, (0, 1))
 datapoint_r3 = datapoint_e.rot90(3, (0, 1))
-n_data = 2
-data = torch.zeros(2, 1, 27, 27)
+n_data = 3
+data = torch.zeros(n_data, 1, 27, 27)
 data[0] = datapoint_e
 data[1] = datapoint_r
-# data[2] = datapoint_r2
+data[2] = datapoint_r2
 
 fig, ax = plt.subplots(1, 3)
 
@@ -87,7 +89,7 @@ ax[1].imshow(data[1][0])
 # unfolded as in main loop
 unfolded = torch.nn.functional.unfold(data, kernel_size=(3, 3), stride=(3, 3))
 print('UNFOLDED SHAPE: ', unfolded.shape)
-unfolded = unfolded.view(2, 1, 9, 81)
+unfolded = unfolded.view(n_data, 1, 9, 81)
 
 # unfolded patches are just what needs to be passed to a filter
 # fig, ax = plt.subplots(1, 9)
@@ -130,7 +132,8 @@ for filter_id, torch_layer in enumerate(torch_layers):
         print('OUTPUT SHAPE: ', channel_output.shape)
     first_layer_output[:, :, filter_id, :,
                        :] = filter_output.view(4, n_data, 9, 9)
-
+first_layer_bias = nn.Parameter(torch.ones(len(torch_layers))*0.1)
+first_layer_output = first_layer_output + first_layer_output
 
 # this works fine
 for channel_id in range(2):
@@ -148,7 +151,7 @@ for channel_id in range(2):
 ##################################################################################################
 # subsequent layer
 """
-#NOTE: THIS BIT OF CODE WORKS - SAVING IN ORDER TO DEV FURTHER
+# NOTE: THIS BIT OF CODE WORKS - SAVING IN ORDER TO DEV FURTHER
 # this is to pretend there's only one channel
 first_layer_output = first_layer_output[:, :, 0, :, :].view(
     4, 2, 1, 9, 9)
@@ -208,7 +211,7 @@ for datapoint_id in range(n_data):
 fig.suptitle('temp second layer')
 plt.show(block=True)
 """
-"""
+
 with_filter_ids_output = first_layer_output.view(4, n_data, 2, 9, 9)
 # second_layer_input = torch.nn.functional.relu(with_filter_ids_output)
 second_layer_input = with_filter_ids_output
@@ -220,6 +223,7 @@ print('UNFOLDED: ', input_channels_unfolded.shape)
 # NOTE adding the permute
 input_channels_unfolded = input_channels_unfolded.view(
     n_data, 4, 2, 9, 9).permute(1, 0, 2, 3, 4)
+"""
 for datapoint_id in range(n_data):
     for channel_id in range(2):
         fig, ax = plt.subplots(4, 9)
@@ -229,14 +233,12 @@ for datapoint_id in range(n_data):
                                                          [patch_id].view(3, 3).detach(), vmin=-0.1, vmax=0.1)
         plt.suptitle(f'unfolded, datapoint {
                      datapoint_id}, channel {channel_id}')
-
-second_layer_output = torch.zeros(4, n_data, 2, 3, 3)
 """
+second_layer_output = torch.zeros(4, n_data, 2, 3, 3)
 
-
-for filter_id, torch_layer in enumerate(subsequent_torch_layers[:1]):
+for filter_id, torch_layer in enumerate(subsequent_torch_layers):
     filter_output = torch.zeros(4, n_data, 9)
-    for input_channel_id in range(1):
+    for input_channel_id in range(2):
         inner_loop_content = input_channels_unfolded[:,
                                                      :, input_channel_id, :, :,]
         patches_to_convolve = inner_loop_content.permute(
@@ -246,6 +248,7 @@ for filter_id, torch_layer in enumerate(subsequent_torch_layers[:1]):
         rotated_patches_to_convolve = create_structured_patches(
             patches_to_convolve).view(4, -1, 9)
 
+        """
         fig, ax = plt.subplots(1, n_data*4*9, figsize=(20, 8))
         # only looking at a single component
         for component_id in range(1, 2):
@@ -254,30 +257,30 @@ for filter_id, torch_layer in enumerate(subsequent_torch_layers[:1]):
                                     [patch_id].view(3, 3).detach())
                 ax[patch_id].axis(
                     'off')
-
         fig.suptitle('patches rotated')
+        """
 
         channel_output = torch.zeros(4, n_data, 9)
         for input_component_id in range(4):
             # NOTE NAMING HERE IS GETTING CONFUSING
-            # outputs_from_filter = torch_layer[input_component_id](
-            #    rotated_patches_to_convolve[input_component_id]).view(4, 3, 9)
-            outputs_from_filter = temp_subsequent_layer[input_component_id](
+            outputs_from_filter = torch_layer[input_component_id](
                 rotated_patches_to_convolve[input_component_id]).view(4, n_data, 9)
+            # outputs_from_filter = temp_subsequent_layer[input_component_id](
+            #    rotated_patches_to_convolve[input_component_id]).view(4, n_data, 9)
             channel_output += outputs_from_filter
         filter_output += channel_output
-    # second_layer_output[:, :, filter_id, :, :] = filter_output.view(4, 3, 3, 3)
     second_layer_output[:, :, filter_id, :,
                         :] = channel_output.view(4, n_data, 3, 3)
-
+second_layer_bias = nn.Parameter(torch.ones(len(subsequent_torch_layers))*0.1)
+second_layer_output = second_layer_output + second_layer_output
 """
-        fig, ax = plt.subplots(2, 4)
-        for i in range(4):
-            ax[0][i].imshow(output[i][0].view(3, 3).detach())
-            ax[1][i].imshow(output[i][1].view(3, 3).detach())
-        fig.suptitle('second layer')
-        plt.show(block=True)
-
+fig, ax = plt.subplots(2, 4)
+for i in range(4):
+    ax[0][i].imshow(output[i][0].view(3, 3).detach())
+    ax[1][i].imshow(output[i][1].view(3, 3).detach())
+fig.suptitle('second layer')
+plt.show(block=True)
+"""
 for channel_id in range(2):
     fig, ax = plt.subplots(n_data, 4)
     for datapoint_id in range(n_data):
@@ -286,4 +289,3 @@ for channel_id in range(2):
                                                   [channel_id].view(3, 3).detach())
     fig.suptitle(f'second layer, channel {channel_id}')
 plt.show(block=True)
-"""

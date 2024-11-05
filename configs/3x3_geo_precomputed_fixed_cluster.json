@@ -1,9 +1,0 @@
-{
-    "n_cpus": 16,
-    "n_cpus_per_model":16,
-    "n_models": 300,
-    "output_models_dir": "3x3_geo_precomputed_fixed",
-    "local_model_save_dir": "models_save_dir/3x3_geo_precomputed_fixed",
-    "image_size": 3,
-    "geo_classifier_implementation": "precomputed_bank"
-}

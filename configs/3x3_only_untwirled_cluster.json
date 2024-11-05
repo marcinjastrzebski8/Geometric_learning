@@ -1,9 +1,0 @@
-{
-    "n_cpus": 16,
-    "n_cpus_per_model":16,
-    "n_models": 100,
-    "output_models_dir": "3x3_only_untwirled",
-    "local_model_save_dir": "models_save_dir/3x3_only_untwirled",
-    "image_size": 3,
-    "geo_classifier_implementation": "auto_twirl_untwirled_only"
-}
