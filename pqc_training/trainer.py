@@ -42,6 +42,11 @@ class Colors(str, Enum):
 
 
 class Trainer(ABC):
+    """
+    NOTE: this Trainer class assumes working with qml.qnodes as models.
+    NewTrainer set up for torch.Module models.
+    """
+
     def __init__(self,
                  init_params: np.ndarray,
                  train_size: int = 1,
@@ -800,3 +805,53 @@ class JaxTrainerJit(Trainer):
                 ] = loss
 
         return get_params(opt_state)
+
+
+class NewTrainer():
+    """
+    TODO: paused devving this, but maybe pick up if useful. I like the idea, just a tiny bit too much effort atm.
+    Should just look for a good example online.
+    Heavily inspired by Trainer class from Callum/Mohammad but for torch.Module-based models.
+    Also written fully by me so I can understand everything that's happening inside.
+    """
+
+    def __init__(self,
+                 train_size: int,
+                 validation_size: int,
+                 k_folds: int = 1,
+                 epochs: int = 1,
+                 batch_size: int = 1,
+                 eval_interval: int = 1,
+                 save_dir: str = ''):
+
+        self.train_size = train_size
+        self.validation_size = validation_size
+        self.k_folds = k_folds
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.eval_interval = eval_interval
+        self.save_dir = save_dir
+
+        self.val_loss_histories = np.full((self.k_folds, int(
+            (self.epochs/self.eval_interval)+1)), np.inf)
+
+    def save_params():
+        pass
+
+    def save_loss():
+        pass
+
+    def save_model():
+        pass
+
+    def validate():
+        pass
+
+    def train(data):
+        for i in range(self.k_folds):
+            current_fold = i
+            train_ids, val_ids = data.split()
+        pass
+
+    def train_loop():
+        pass

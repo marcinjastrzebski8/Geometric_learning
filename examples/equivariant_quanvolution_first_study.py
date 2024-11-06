@@ -22,6 +22,7 @@ import itertools
 import json
 import numpy as np
 from pathlib import Path
+import tempfile
 
 import ray
 from ray import train as ray_train
@@ -29,6 +30,7 @@ from ray import tune
 import wandb
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.tune.schedulers import ASHAScheduler
+from ray.train import Checkpoint
 import torch
 from torch import nn, optim
 from sklearn.metrics import accuracy_score
@@ -57,14 +59,18 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500)
         for batch in batches:
             images = batch['data']
             labels = batch['labels']
-            print('labels: ', labels)
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item() * images.size(0)
+            with tempfile.TemporaryDirectory() as tempdir:
+                ray_train.report(
+                    metrics={'loss': running_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+
         epoch_loss = running_loss / len(train_dict['data'])
+
         print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
 
