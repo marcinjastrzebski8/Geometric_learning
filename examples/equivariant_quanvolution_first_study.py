@@ -44,14 +44,14 @@ api = wandb.Api()
 path_to_package = Path('.').absolute()
 
 
-def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500):
+def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=10):
     """
     Stolen from Callum and modified. Ideally I'd revisit my trainer.py module - it should encompass anything like this example.
     """
     model.train()
     # NOTE: TRAIN DATA SIZE HARDCODED
     batches = [{'data': train_dict['data']
-                [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 500, batch_size)]
+                [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 10, batch_size)]
     for epoch in range(epochs):
         print('epoch: ', epoch)
         running_loss = 0.0
@@ -60,7 +60,7 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500)
             images = batch['data']
             labels = batch['labels']
             optimizer.zero_grad()
-            outputs = model(images)
+            outputs = model(images).view(-1)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -68,6 +68,7 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500)
             with tempfile.TemporaryDirectory() as tempdir:
                 ray_train.report(
                     metrics={'loss': running_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+            print('RUNNING LOSS', running_loss)
 
         epoch_loss = running_loss / len(train_dict['data'])
 
@@ -107,7 +108,7 @@ def prep_microboone_data(which_set: str):
     data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
     print('DATA IS SHAPE ', data.shape)
     labels = torch.load(labels_file)
-    data_dict = {'data': data, 'labels': labels}
+    data_dict = {'data': data[:10], 'labels': labels[:10]}
 
     return data_dict
 
@@ -163,17 +164,17 @@ def main(json_config):
                 super().__init__()
                 self.conv1 = prep_equiv_quanv_model(is_first_layer=True)
                 self.conv2 = prep_equiv_quanv_model(is_first_layer=False)
-                self.drouput1 = False
-                self.drouput2 = False
+                self.dropout0 = False
+                self.dropout1 = False
                 dense_shape_0 = config['dense_units'][0]
                 dense_shape_1 = config['dense_units'][1]
                 dense_input_shape = 4 * \
                     (json_config['image_size']-2)*(json_config['image_size']-2)
                 if config['use_dropout0']:
-                    self.drouput0 = nn.Dropout(config['dropout0'])
+                    self.dropout0 = nn.Dropout(config['dropout0'])
 
                 if config['use_dropout1']:
-                    self.drouput1 = nn.Dropout(config['dropout1'])
+                    self.dropout1 = nn.Dropout(config['dropout1'])
 
                 # NOTE: input size is hardcoded for kernel size + stride. TODO: Could generalise.
                 self.fc0 = nn.Linear(
@@ -190,17 +191,17 @@ def main(json_config):
                 x = x.permute(1, 0, 2, 3, 4)
                 x = torch.flatten(x, 1)
                 x = nn.functional.relu(self.fc0(x))
+                if self.dropout0:
+                    x = self.dropout0(x)
+                x = nn.functional.relu(self.fc1(x))
                 if self.dropout1:
                     x = self.dropout1(x)
-                x = nn.functional.relu(self.fc1(x))
-                if self.dropout2:
-                    x = self.dropout2(x)
                 x = self.fc2(x)
                 return x
 
         # trainer here
         tr_dict = prep_microboone_data('train')
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.BCEWithLogitsLoss()
         model = EquivQuanvClassifier()
         optimiser = optim.Adam(model.parameters(), lr=config['lr'])
         # TODO: CHECK HOW MANY EPOCHS CALLUM DID
