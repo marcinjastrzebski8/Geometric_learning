@@ -68,7 +68,6 @@ class Quanvolution2DTorchLayer(nn.Module):
 
     quantum_circs: List of circuit class objects (I don't have a common base class yet)
     quantum_circs_properties: List of dicts which are the properties of their corresponding circuits, needed to define the qnodes which act as filters
-    input_channel_shape: TODO - rethink with new batching
     stride:
     kernel_size:
     weight_shapes_list:
@@ -77,12 +76,12 @@ class Quanvolution2DTorchLayer(nn.Module):
     def __init__(self,
                  quantum_circs: Sequence,
                  quantum_circs_properties: Sequence[dict],
-                 input_channel_shape: tuple,
+                 input_image_shape: tuple,
                  stride,
                  kernel_size,
                  weight_shapes_list: Sequence[dict]):
         super().__init__()
-        self.input_channel_shape = input_channel_shape
+        self.input_image_shape = input_image_shape
         self.strides = (stride, stride) if isinstance(
             stride, int) else stride
         self.kernel_sizes = (kernel_size, kernel_size) if isinstance(
@@ -93,9 +92,9 @@ class Quanvolution2DTorchLayer(nn.Module):
 
         # Calculate the number of convolution iterations
         # TODO: THIS DOESNT SUPPORT PADDING
-        self.h_iter = int(1 + (self.input_channel_shape[0] -
+        self.h_iter = int(1 + (self.input_image_shape[0] -
                                self.kernel_sizes[0]) / self.strides[0])
-        self.w_iter = int(1 + (self.input_channel_shape[1] -
+        self.w_iter = int(1 + (self.input_image_shape[1] -
                                self.kernel_sizes[1]) / self.strides[1])
 
         print('OUTPUT SIZE:', self.h_iter, self.w_iter)
@@ -170,7 +169,6 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
     quantum_circs: List of circuit class objects (I don't have a common base class yet)
     quantum_circs_properties: List of dicts which are the properties of their corresponding circuits, needed to define the qnodes which act as filters
-    input_channel_shape:
     stride:
     kernel_size:
     weight_shapes_list:
@@ -183,7 +181,7 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                  is_first_layer_quanv: bool,
                  quantum_circs: Sequence,
                  quantum_circs_properties: Sequence[dict],
-                 input_channel_shape: tuple,
+                 input_image_shape: tuple,
                  stride,
                  kernel_size,
                  weight_shapes_list: Sequence[dict],
@@ -192,20 +190,20 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
         # for now this is just a dictionary with very minimal information - group size
         self.group = group
         self.is_first_layer_quanv = is_first_layer_quanv
-        self.input_channel_shape = input_channel_shape
+        self.input_image_shape = input_image_shape
         self.strides = (stride, stride) if isinstance(
             stride, int) else stride
         self.kernel_sizes = (kernel_size, kernel_size) if isinstance(
             kernel_size, int) else kernel_size
-        # TODO: ALLOW FOR SOME USER INPUT
+
         init_method = functools.partial(
             torch.nn.init.uniform_, b=weights_init_max_val)
 
         # Calculate the number of convolution iterations
         # TODO: THIS DOESNT SUPPORT PADDING
-        self.h_iter = int(1 + (self.input_channel_shape[0] -
+        self.h_iter = int(1 + (self.input_image_shape[0] -
                                self.kernel_sizes[0]) / self.strides[0])
-        self.w_iter = int(1 + (self.input_channel_shape[1] -
+        self.w_iter = int(1 + (self.input_image_shape[1] -
                                self.kernel_sizes[1]) / self.strides[1])
 
         print('OUTPUT SIZE:', self.h_iter, self.w_iter)
@@ -235,10 +233,6 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
         Torch layer is a TorchLayer object or Sequence[TorchLayer], if self.is_first_layer = True/False
         """
 
-        # NOTE THAT WE CAN'T 'ROTATE' THE CIRCUIT BECAUSE IT'S NOT A FUNCTION OF GROUP ELEMENTS
-        # WE CAN INSTEAD ROTATE THE SELECTED PATCH OF FEATURE MAP BUT I THINK YOU NEED TO DO IT BACKWARDS
-
-        # in case the layer acts on a simple image (function on z2)
         if self.is_first_layer_quanv:
 
             # each data point split into the different patches we'll be convolving over
