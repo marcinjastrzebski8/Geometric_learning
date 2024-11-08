@@ -44,14 +44,14 @@ api = wandb.Api()
 path_to_package = Path('.').absolute()
 
 
-def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=10):
+def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500):
     """
     Stolen from Callum and modified. Ideally I'd revisit my trainer.py module - it should encompass anything like this example.
     """
     model.train()
     # NOTE: TRAIN DATA SIZE HARDCODED
     batches = [{'data': train_dict['data']
-                [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 10, batch_size)]
+                [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 500, batch_size)]
     for epoch in range(epochs):
         print('epoch: ', epoch)
         running_loss = 0.0
@@ -68,7 +68,6 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=10):
             with tempfile.TemporaryDirectory() as tempdir:
                 ray_train.report(
                     metrics={'loss': running_loss}, checkpoint=Checkpoint.from_directory(tempdir))
-            print('RUNNING LOSS', running_loss)
 
         epoch_loss = running_loss / len(train_dict['data'])
 
@@ -108,7 +107,7 @@ def prep_microboone_data(which_set: str):
     data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
     print('DATA IS SHAPE ', data.shape)
     labels = torch.load(labels_file)
-    data_dict = {'data': data[:10], 'labels': labels[:10]}
+    data_dict = {'data': data, 'labels': labels}
 
     return data_dict
 
@@ -156,7 +155,8 @@ def main(json_config):
                                                                input_channel_side_len),
                                                               1,
                                                               2,
-                                                              [{'params': (n_reuploads, n_layers, 2*4)}])
+                                                              [{'params': (n_reuploads, n_layers, 2*4)}],
+                                                              config['param_init_max_vals'])
             return quanv_layer
 
         class EquivQuanvClassifier(nn.Module):
@@ -211,9 +211,9 @@ def main(json_config):
     # search space params
     lr = tune.loguniform(0.001, 0.1)
     dense_units = tune.choice([[128, 32], [8, 8]])
-    param_init_max_vals = [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi]
-    n_reuploads = tune.choice([1, 1, 1, 2, 3, 4])
-    n_layers = tune.choice([1, 2, 3, 4, 5])
+    param_init_max_vals = tune.choice([0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
+    n_reuploads = tune.choice([1])
+    n_layers = tune.choice([1, 2, 3, 4])
     dropout_bool = tune.choice([True, False])
     dropout_amount = tune.uniform(1e-4, 0.5)
 
