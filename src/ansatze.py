@@ -72,11 +72,11 @@ class SimpleAnsatz1(Operation):
 class MatchCallumAnsatz(Operation):
     """
     Seems slightly different to any other simple ansatz I've got so far and want to match Callum exactly.
-    TODO: FIGURE OUT WHAT ANSATZ BLOCK IS MEANT TO BE. I'M GUESSING ANY SEQUENCE OF GATES THAT GOES ON A SINGLE QUBIT.
     """
 
     def __init__(self, params, wires=None, config=None):
-        self._hyperparameters = {'n_layers': config['n_layers']}
+        self._hyperparameters = {'n_layers': config['n_layers'],
+        'ansatz_block': config['ansatz_block']}
         super().__init__(params, wires)
 
     @staticmethod
@@ -85,12 +85,14 @@ class MatchCallumAnsatz(Operation):
 
     @staticmethod
     def compute_decomposition(*params, wires=None, **hyperparameters):
+        # the unpacking adds an extra dimension which is spurious
+        params = params[0]
         op_list = []
         wires = qml.wires.Wires(wires)
         for j in range(hyperparameters['n_layers']):
             for k, wire in enumerate(wires):
                 for a_i, a in enumerate(hyperparameters['ansatz_block']):
-                    op_list.append(a(params[j][k][a_i]), wires=wire)
+                    op_list.append(a(params[j][k][a_i], wires=wire))
                 if k != len(wires)-1:
                     qml.CNOT(wires=[k, k+1])
 

@@ -52,6 +52,7 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500)
     # NOTE: TRAIN DATA SIZE HARDCODED
     batches = [{'data': train_dict['data']
                 [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 500, batch_size)]
+    val_dict = prep_microboone_data('val')
     for epoch in range(epochs):
         print('epoch: ', epoch)
         running_loss = 0.0
@@ -65,12 +66,15 @@ def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500)
             loss.backward()
             optimizer.step()
             running_loss += loss.item() * images.size(0)
-            with tempfile.TemporaryDirectory() as tempdir:
-                ray_train.report(
-                    metrics={'loss': running_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+        
+        val_outputs = model(val_dict['data']).view(-1)
+        val_loss = criterion(val_outputs, val_dict['labels']).item()
 
         epoch_loss = running_loss / len(train_dict['data'])
-
+        with tempfile.TemporaryDirectory() as tempdir:
+                ray_train.report(
+                    metrics={'loss': epoch_loss, 'val_loss': val_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+        
         print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
 
 
@@ -120,13 +124,14 @@ def main(json_config):
         Takes config which defines search space. Needs to be of this format for ray.
         NOTE: this is defined inside main because that way I can access arguments from json_config easily
         """
+        print('THIS IS CONFIG', config)
 
         def prep_equiv_quanv_model(is_first_layer):
             n_layers = config['n_layers']
             n_reuploads = config['n_reuploads']
             # CHANGE TO CALLUM ANSATZ ONCE HE SENDS DETAILS
             patch_circuit = BasicClassifierTorch(feature_map='RotEmbedding',
-                                                 ansatz=SimpleAnsatz1,
+                                                 ansatz=MatchCallumAnsatz,
                                                  size=4,
                                                  n_reuploads=n_reuploads)
             patch_circuit_properties = {
@@ -147,6 +152,7 @@ def main(json_config):
                                             for i in range(4)]
 
             group_info = {'size': 4}
+            #NOTE: parameter shape is kind of hardcoded, could do some lookup table based on ansatz 
             quanv_layer = EquivariantQuanvolution2DTorchLayer(group_info,
                                                               is_first_layer,
                                                               quantum_circs,
@@ -155,7 +161,7 @@ def main(json_config):
                                                                input_channel_side_len),
                                                               1,
                                                               2,
-                                                              [{'params': (n_reuploads, n_layers, 2*4)}],
+                                                              [{'params': (n_reuploads, n_layers, 4, 2)}],
                                                               config['param_init_max_vals'])
             return quanv_layer
 
