@@ -43,8 +43,6 @@ from data.datasets import MicrobooneTrainData, MicrobooneValData
 api = wandb.Api()
 path_to_package = Path('.').absolute()
 
-# TODO: CHANGE TO CORRECT DATA SIZES - FOR NOW TINY SIZES FOR TESTING
-
 
 def train_model(model, dataset, criterion, optimizer, epochs, batch_size=500, val_dataset=None):
     """
@@ -61,7 +59,7 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size=500, va
                   dataset,
                   optimizer,
                   criterion,
-                  5,
+                  500,
                   0,
                   batch_size,
                   val_dataset,
@@ -131,7 +129,7 @@ def main(json_config):
         optimiser = optim.Adam(model.parameters(), lr=config['lr'])
         # TODO: CHECK HOW MANY EPOCHS CALLUM DID
         train_model(model, MicrobooneTrainData(), criterion,
-                    optimiser, json_config['n_epochs'], val_dataset=MicrobooneValData()[:5])
+                    optimiser, json_config['n_epochs'], val_dataset=MicrobooneValData())
 
     # search space params
     lr = tune.loguniform(0.001, 0.1)
