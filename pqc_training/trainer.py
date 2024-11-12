@@ -12,7 +12,7 @@ import yaml
 import pennylane as qml
 from pennylane import numpy as qnp
 import cloudpickle
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 import matplotlib.pyplot as plt
 from pqc_training.utils import weight_init
 from ray import train as ray_train
@@ -432,7 +432,7 @@ class TorchQMLTrainer(Trainer):
 
 class JaxTrainer(Trainer):
     """
-    Trainer which uses Jax pipeline. 
+    Trainer which uses Jax pipeline.
     """
     # @jax.jit
 
@@ -809,6 +809,7 @@ class JaxTrainerJit(Trainer):
 
 class NewTrainer():
     """
+    NOTE: DOES NOT INHERIT FROM TRAINER AS TRAINER DOES NOT SUPPORT NN.MODULE BASED CLASSIFIERS
     TODO: paused devving this, but maybe pick up if useful. I like the idea, just a tiny bit too much effort atm.
     Should just look for a good example online.
     Heavily inspired by Trainer class from Callum/Mohammad but for torch.Module-based models.
@@ -816,42 +817,120 @@ class NewTrainer():
     """
 
     def __init__(self,
-                 train_size: int,
-                 validation_size: int,
                  k_folds: int = 1,
                  epochs: int = 1,
-                 batch_size: int = 1,
                  eval_interval: int = 1,
                  save_dir: str = ''):
 
-        self.train_size = train_size
-        self.validation_size = validation_size
         self.k_folds = k_folds
+        self.current_fold = 0
         self.epochs = epochs
-        self.batch_size = batch_size
         self.eval_interval = eval_interval
         self.save_dir = save_dir
-
+        # use these if not saving with ray
         self.val_loss_histories = np.full((self.k_folds, int(
             (self.epochs/self.eval_interval)+1)), np.inf)
+        self.train_loss_histories = np.full(
+            (self.k_folds, self.epochs + 1), np.inf)
 
-    def save_params():
-        pass
+    def save_model(self, model, save_dir):
+        with open(f"{str(save_dir)}/model_state.pth", "wb") as f:
+            torch.save(model.state_dict(), f)
 
-    def save_loss():
-        pass
+    def save_losses(self, save_dir):
+        np.save(f"{save_dir}/train_losses.npy", self.train_loss_hist)
+        np.save(f"{save_dir}/val_losses.npy", self.val_loss_histories)
 
-    def save_model():
-        pass
+    def validate(self, model, validation_dataset, criterion):
+        outputs = model(validation_dataset[0]).view(-1)
+        val_loss = criterion(outputs, validation_dataset[1])
+        return val_loss.item()
 
-    def validate():
-        pass
+    def train(self,
+              model,
+              data: Dataset,
+              optimizer,
+              criterion,
+              train_size: int,
+              validation_size: int,
+              batch_size: int,
+              standalone_val_dataset: Optional[Dataset] = None,
+              use_ray=False):
+        """
+        Allows for k-fold validation training.
+        If k is set to 1 but validation is desired, a separate standalone validation dataset can be passed.
+        NOTE: train_size and validation size are not smart. Need to make sense with k_folds.
 
-    def train(data):
+        """
+
+        model.train()
+        # k-fold validation training loop
         for i in range(self.k_folds):
-            current_fold = i
-            train_ids, val_ids = data.split()
-        pass
+            self.current_fold = i
+            train_ids, val_ids = data.split(
+                train_size=train_size, validation_size=validation_size)
 
-    def train_loop():
-        pass
+            if (self.k_folds == 1) and validation_size == 0:
+                val_data = standalone_val_dataset
+            else:
+                val_data: Dataset | Subset = Subset(data, val_ids)
+            train_data = Subset(data, train_ids)
+
+            train_loader = DataLoader(
+                train_data, batch_size=int(batch_size))
+            self.train_loop(model, train_loader, val_data,
+                            optimizer, criterion, use_ray)
+
+    def train_loop(self,
+                   model,
+                   train_loader,
+                   val_data,
+                   optimizer,
+                   criterion,
+                   use_ray):
+        """
+        Loop over epochs and batches.
+        Assumes loss (criterion) which averages over batch.
+        """
+
+        for i in range(self.epochs+1):
+            running_loss = 0.0
+            for batch_data, batch_labels in train_loader:
+                optimizer.zero_grad()
+                outputs = model(batch_data).view(-1)
+                loss = criterion(outputs, batch_labels)
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item() * batch_data.size(0)
+            # training loss
+            epoch_loss = running_loss/len(train_loader.dataset)
+
+            if i % self.eval_interval == 0:
+                # validate
+                if val_data is not None:
+                    val_loss = self.validate(model, val_data, criterion)
+                else:
+                    val_loss = 0
+
+                # model states are saved when training loss becomes smallest in history
+                # NOTE: this might not be the best strategy
+                # report losses to ray
+                if use_ray:
+                    with tempfile.TemporaryDirectory() as tempdir:
+                        if np.all(epoch_loss < self.train_loss_histories):
+                            self.save_model(model, tempdir)
+                        ray_train.report(
+                            metrics={'loss': epoch_loss, 'val_loss': val_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+                # report losses locally
+                else:
+                    if np.all(epoch_loss < self.train_loss_histories):
+                        self.save_model(model, self.save_dir)
+
+                    self.save_losses(self.save_dir)
+
+                # update loss history
+                self.train_loss_histories[self.current_fold, i] = epoch_loss
+                self.val_loss_histories[
+                    self.current_fold, int(i / self.eval_interval)
+                ] = val_loss

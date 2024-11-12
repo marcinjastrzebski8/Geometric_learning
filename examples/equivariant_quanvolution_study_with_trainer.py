@@ -13,12 +13,10 @@ Config needs to contain:
 - n_models: int
 (results path info)
 - output_models_dir: str
-- local_model_save_dir: str [TODO: make optional, only when not using ray]
+- local_model_save_dir: str [TODO: is this needed when using ray?]
 """
 
-import pennylane as qml
 import argparse
-import itertools
 import json
 import numpy as np
 from pathlib import Path
@@ -33,88 +31,41 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.train import Checkpoint
 import torch
 from torch import nn, optim
-from torch.utils.data import Dataset
-from sklearn.metrics import accuracy_score
 from pennylane import RX, RY, RZ
 
 from src.quanvolution import EquivariantQuanvolution2DTorchLayer
 from src.geometric_classifier import BasicClassifierTorch
-from src.ansatze import MatchCallumAnsatz, SimpleAnsatz1
+from src.ansatze import MatchCallumAnsatz
+from src.torch_architectures import ConvolutionalEQNEC
+from pqc_training.trainer import NewTrainer
+from data.datasets import MicrobooneTrainData, MicrobooneValData
 
 api = wandb.Api()
 path_to_package = Path('.').absolute()
 
+# TODO: CHANGE TO CORRECT DATA SIZES - FOR NOW TINY SIZES FOR TESTING
 
-def train_model(model, train_dict, criterion, optimizer, epochs, batch_size=500):
+
+def train_model(model, dataset, criterion, optimizer, epochs, batch_size=500, val_dataset=None):
     """
-    Stolen from Callum and modified. Ideally I'd revisit my trainer.py module - it should encompass anything like this example.
+    This changed from first study script to utilise the new trainer class.
     """
     model.train()
+
+    trainer = NewTrainer(k_folds=1,
+                         epochs=epochs,
+                         eval_interval=1,
+                         )
     # NOTE: TRAIN DATA SIZE HARDCODED
-    batches = [{'data': train_dict['data']
-                [i:i+batch_size], 'labels': train_dict['labels'][i:i+batch_size]} for i in range(0, 500, batch_size)]
-    val_dict = prep_microboone_data('val')
-    for epoch in range(epochs):
-        print('epoch: ', epoch)
-        running_loss = 0.0
-        # batch loop
-        for batch in batches:
-            images = batch['data']
-            labels = batch['labels']
-            optimizer.zero_grad()
-            outputs = model(images).view(-1)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item() * images.size(0)
-
-        val_outputs = model(val_dict['data']).view(-1)
-        val_loss = criterion(val_outputs, val_dict['labels']).item()
-
-        epoch_loss = running_loss / len(train_dict['data'])
-        with tempfile.TemporaryDirectory() as tempdir:
-            ray_train.report(
-                metrics={'loss': epoch_loss, 'val_loss': val_loss}, checkpoint=Checkpoint.from_directory(tempdir))
-
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}')
-
-
-def evaluate_model(model, test_dict):
-    model.eval()
-    all_labels = []
-    all_preds = []
-
-    with torch.no_grad():
-        for images, labels in zip(test_dict['data'], test_dict['labels']):
-            preds = model(images)
-
-            all_labels.extend(labels.numpy())
-            all_preds.extend(preds.numpy())
-
-    accuracy = accuracy_score(all_labels, all_preds)
-    print(f'Test accuracy: {accuracy:.4f}')
-    print(all_labels)
-    print(all_preds)
-
-
-def prep_microboone_data(which_set: str):
-    """
-    Microboone data, taken directly form Callum to ensure like-to-like comparison.
-    """
-
-    path_to_microboone_data = path_to_package/'data/microboone_from_callum/'
-
-    data_file = path_to_microboone_data/f'{which_set}_data.pt'
-    labels_file = path_to_microboone_data/f'{which_set}_labels.pt'
-
-    data = torch.load(data_file)
-    # need to add the channel dimension (grayscale image in this case)
-    data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
-    print('DATA IS SHAPE ', data.shape)
-    labels = torch.load(labels_file)
-    data_dict = {'data': data, 'labels': labels}
-
-    return data_dict
+    trainer.train(model,
+                  dataset,
+                  optimizer,
+                  criterion,
+                  5,
+                  0,
+                  batch_size,
+                  val_dataset,
+                  True)
 
 
 def main(json_config):
@@ -167,54 +118,20 @@ def main(json_config):
                                                               config['param_init_max_vals'])
             return quanv_layer
 
-        class EquivQuanvClassifier(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.conv1 = prep_equiv_quanv_model(is_first_layer=True)
-                self.conv2 = prep_equiv_quanv_model(is_first_layer=False)
-                self.dropout0 = False
-                self.dropout1 = False
-                dense_shape_0 = config['dense_units'][0]
-                dense_shape_1 = config['dense_units'][1]
-                dense_input_shape = 4 * \
-                    (json_config['image_size']-2)*(json_config['image_size']-2)
-                if config['use_dropout0']:
-                    self.dropout0 = nn.Dropout(config['dropout0'])
-
-                if config['use_dropout1']:
-                    self.dropout1 = nn.Dropout(config['dropout1'])
-
-                # NOTE: input size is hardcoded for kernel size + stride. TODO: Could generalise.
-                self.fc0 = nn.Linear(
-                    dense_input_shape, dense_shape_0)
-                self.fc1 = nn.Linear(
-                    dense_shape_0, dense_shape_1)
-                self.fc2 = nn.Linear(dense_shape_1, 1)
-
-            def forward(self, x):
-                # NOTE: Callum is using batch normalisation here which is not equivariant by default,
-                # could use the escnn package to do that if needed
-                x = nn.functional.relu(self.conv1(x))
-                x = nn.functional.relu(self.conv2(x))
-                x = x.permute(1, 0, 2, 3, 4)
-                x = torch.flatten(x, 1)
-                x = nn.functional.relu(self.fc0(x))
-                if self.dropout0:
-                    x = self.dropout0(x)
-                x = nn.functional.relu(self.fc1(x))
-                if self.dropout1:
-                    x = self.dropout1(x)
-                x = self.fc2(x)
-                return x
-
-        # trainer here
-        tr_dict = prep_microboone_data('train')
         criterion = nn.BCEWithLogitsLoss()
-        model = EquivQuanvClassifier()
+        architecture_config = {'quanv0': prep_equiv_quanv_model(True),
+                               'quanv1': prep_equiv_quanv_model(False),
+                               'dense_units': config['dense_units'],
+                               'image_size': json_config['image_size'],
+                               'use_dropout0': config['use_dropout0'],
+                               'use_dropout1': config['use_dropout1'],
+                               'dropout0': config['dropout0'],
+                               'dropout1': config['dropout1']}
+        model = ConvolutionalEQNEC(architecture_config)
         optimiser = optim.Adam(model.parameters(), lr=config['lr'])
         # TODO: CHECK HOW MANY EPOCHS CALLUM DID
-        train_model(model, tr_dict, criterion,
-                    optimiser, json_config['n_epochs'])
+        train_model(model, MicrobooneTrainData(), criterion,
+                    optimiser, json_config['n_epochs'], val_dataset=MicrobooneValData()[:5])
 
     # search space params
     lr = tune.loguniform(0.001, 0.1)
@@ -244,7 +161,7 @@ def main(json_config):
         train_ray, {'cpu': json_config['n_cpus_per_model']})
     run_config = ray_train.RunConfig(storage_path=path_to_package, name=json_config['output_models_dir'], callbacks=[
         WandbLoggerCallback(project=json_config['output_models_dir'])], checkpoint_config=ray_train.CheckpointConfig(
-        checkpoint_score_attribute='loss', num_to_keep=5))
+        checkpoint_score_attribute='loss'))
     tuner = tune.Tuner(trainable_with_resources, param_space=search_space, tune_config=tune.TuneConfig(
         metric='loss', mode='min', num_samples=json_config['n_models'], scheduler=scheduler), run_config=run_config)
     tuner.fit()
