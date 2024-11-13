@@ -29,18 +29,21 @@ def find_latest_checkpoint_dir(run_path):
     return latest_checkpoint_dir_name
 
 
-def get_best_config_and_params_from_run(model_name, path_to_saved_results):
+def get_best_config_and_params_from_run(model_name, path_to_saved_results, state_dict_saved=False):
     # e.g. some_model_2a34
     print(model_name)
     # NOTE: I didn't need the best models dir last time - not sure what changed
     run_dir = match_run_dir(model_name, path_to_saved_results)
     checkpoint_dir = find_latest_checkpoint_dir(
         path_to_saved_results / run_dir)  # e.g. checkpoint_000010
-    best_params_dir = path_to_saved_results / \
-        run_dir / checkpoint_dir / 'params.pkl'
-    best_params = pd.read_pickle(best_params_dir)
-    best_config_pkl = Path(best_params_dir).parent.parent/'params.pkl'
-    best_config = pd.read_pickle(best_config_pkl)
+    if state_dict_saved:
+        best_params_dir = run_dir/checkpoint_dir/'model_state.pth'
+    else:
+        best_params_dir = path_to_saved_results / \
+            run_dir / checkpoint_dir / 'params.pkl'
+        best_params = pd.read_pickle(best_params_dir)
+        best_config_pkl = Path(best_params_dir).parent.parent/'params.pkl'
+        best_config = pd.read_pickle(best_config_pkl)
 
     return best_config, best_params
 

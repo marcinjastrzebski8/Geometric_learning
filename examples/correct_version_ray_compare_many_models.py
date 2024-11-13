@@ -21,7 +21,7 @@ from pathlib import Path
 import ray
 from ray import train as ray_train
 from ray import tune
-from utils import SymmetricDatasetJax
+from data.datasets import SymmetricDatasetJax
 from jax.example_libraries import optimizers
 import numpy as np
 from src.geometric_classifier import GeometricClassifierAutotwirlJax, BasicClassifier
@@ -93,7 +93,7 @@ def main(json_config):
                                               'embedding_pauli': tune.choice(single_qubit_pauli[:2]),
                                               'n_layers': tune.randint(2, 6),
                                               'twirled_bool': tune.grid_search([True, False]),
-                                              'lr': tune.loguniform(1e-3, 1e-2), 
+                                              'lr': tune.loguniform(1e-3, 1e-2),
                                               'batch_size': tune.randint(10, 100)
                                               }
 
@@ -114,7 +114,7 @@ def main(json_config):
                         'pauli_words': tune.choice(combos_for_2local_blocks),
                         'group_equiv_1local_gate': tune.grid_search([C4On9QEquivGate1Local]),
                         'group_equiv_2local_gate': tune.grid_search([C4On9QEquivGate2Local]),
-                        'lr': tune.loguniform(1e-4, 1e-2), 
+                        'lr': tune.loguniform(1e-4, 1e-2),
                         'batch_size': tune.randint(10, 100)
                         }
 

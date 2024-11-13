@@ -4,7 +4,7 @@ from src.embeddings import RotEmbedding
 from src.twirling import c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
 from src.losses import sigmoid_activation
 from src.ansatze import GeometricAnsatzConstructor
-from utils import get_model_names_from_wandb, get_best_config_and_params_from_run, SymmetricDatasetJax
+from examples.utils import get_model_names_from_wandb, get_best_config_and_params_from_run, SymmetricDatasetJax
 import wandb
 import pennylane as qml
 from pathlib import Path

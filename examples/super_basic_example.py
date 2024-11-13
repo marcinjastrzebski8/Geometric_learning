@@ -2,7 +2,7 @@
 basic_example was still too complicated
 """
 
-from utils import SimpleSymmetricDataset
+from data.datasets import SimpleSymmetricDataset
 from src.geometric_classifier import QuanumClassifier, GeometricClassifier
 import pennylane as qml
 from pennylane import numpy as jnp

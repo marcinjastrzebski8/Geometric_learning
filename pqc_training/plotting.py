@@ -1,5 +1,5 @@
 from experiments import ExperimentPlotter, get_experiment_results_dir, get_roc_data
-from utils import (
+from examples.utils import (
     DatasetFactory,
     Permute,
     convert_h5_to_lists,
@@ -18,7 +18,7 @@ import pennylane as qml
 
 # from testing import test_on_new_anomalies
 from pennylane import numpy as qnp
-from utils import weight_init
+from examples.utils import weight_init
 import itertools
 from functools import partial
 import os

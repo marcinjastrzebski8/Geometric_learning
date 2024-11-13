@@ -2,7 +2,7 @@ import numpy as np
 import pennylane as qml
 from circuits import ansatz_dict, embedding_dict
 from losses import fidelity_loss
-from utils import (
+from examples.utils import (
     HiggsDataset,
     ConfigReader,
     weight_init,
@@ -68,7 +68,8 @@ class Tester(ABC):
         low_bound = tpr_working_point * 0.999
         up_bound = tpr_working_point * 1.001
         while len(ind) == 0:
-            ind = np.where(np.logical_and(tpr >= low_bound, tpr <= up_bound))[0]
+            ind = np.where(np.logical_and(
+                tpr >= low_bound, tpr <= up_bound))[0]
             low_bound *= 0.99  # open the window by 1%
             up_bound *= 1.01
         fpr_window_no_zeros = fpr[ind][fpr[ind] != 0]
@@ -215,19 +216,22 @@ class QuantumTester(Tester):
 
         @qml.qnode(device=dev)
         def feature_vec(feature):
-            self.properties["embedding_fn"](feature, self.properties["input_size"])
+            self.properties["embedding_fn"](
+                feature, self.properties["input_size"])
             return qml.state()
 
         @qml.qnode(device=dev)
         def recon_vec(feature, params):
-            self.properties["embedding_fn"](feature, self.properties["input_size"])
+            self.properties["embedding_fn"](
+                feature, self.properties["input_size"])
             self.properties["ansatz_fn"](
                 params,
                 wires=range(self.properties["input_size"]),
                 config=self.properties,
             )
             for i in range(self.properties["trash_size"]):
-                qml.measure(wires=self.properties["latent_size"] + i, reset=True)
+                qml.measure(
+                    wires=self.properties["latent_size"] + i, reset=True)
 
             qml.adjoint(
                 self.properties["ansatz_fn"](
@@ -547,7 +551,8 @@ def heatmap(x, y, **kwargs):
         y_names = [t for t in sorted(set([v for v in y]))]
     y_to_num = {p[1]: p[0] for p in enumerate(y_names)}
 
-    plot_grid = plt.GridSpec(1, 15, hspace=0.2, wspace=0.1)  # Setup a 1x10 grid
+    plot_grid = plt.GridSpec(
+        1, 15, hspace=0.2, wspace=0.1)  # Setup a 1x10 grid
     ax = plt.subplot(
         plot_grid[:, :-1]
     )  # Use the left 14/15ths of the grid for the main plot
@@ -582,7 +587,8 @@ def heatmap(x, y, **kwargs):
         **kwargs_pass_on,
     )
     ax.set_xticks([v for k, v in x_to_num.items()])
-    ax.set_xticklabels([k for k in x_to_num], rotation=45, horizontalalignment="right")
+    ax.set_xticklabels([k for k in x_to_num], rotation=45,
+                       horizontalalignment="right")
     ax.set_yticks([v for k, v in y_to_num.items()])
     ax.set_yticklabels([k for k in y_to_num])
 
@@ -600,7 +606,8 @@ def heatmap(x, y, **kwargs):
 
     # Add color legend on the right side of the plot
     if color_min < color_max:
-        ax = plt.subplot(plot_grid[:, -1])  # Use the rightmost column of the plot
+        # Use the rightmost column of the plot
+        ax = plt.subplot(plot_grid[:, -1])
 
         col_x = [0] * len(palette)  # Fixed x coordinate for the bars
         bar_y = np.linspace(
@@ -778,7 +785,8 @@ if __name__ == "__main__":
     # main()
     d = np.array([[200, 20], [30, 400]])
     len(d)
-    labels = ["True Negative", "False Positive", "False Negative", "True Positive"]
+    labels = ["True Negative", "False Positive",
+              "False Negative", "True Positive"]
     categories = ["Background", "Signal"]
     make_confusion_matrix(
         d,

@@ -5,7 +5,7 @@ We'll stick to 2x2 images at first.
 #TODO: figure out how to jit properly
 """
 
-from utils import SymmetricDatasetJax
+from data.datasets import SymmetricDatasetJax
 from src.geometric_classifier import GeometricClassifierAutotwirlJax
 from src.losses import sigmoid_activation
 import numpy as np

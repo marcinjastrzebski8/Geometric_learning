@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, roc_curve
-from utils import DataLoader
+from examples.utils import DataLoader
 import yaml
 from circuits import (
     ansatz_dict,
@@ -21,7 +21,7 @@ from tqdm import tqdm
 import sys
 import os
 from pathlib import Path
-from utils import (
+from examples.utils import (
     transform,
     HiggsDataset,
     Scale,
@@ -32,7 +32,7 @@ from utils import (
 )
 from dataclasses import dataclass
 from typing import Tuple, Callable, Dict, NamedTuple, List
-from utils import DynamicEntanglement
+from examples.utils import DynamicEntanglement
 import torch
 from abc import ABC, abstractmethod
 import jax
@@ -89,7 +89,8 @@ class Trainer(ABC):
 
     def save_losses_and_info(self, save_dir):
         np.save(f"{save_dir}/train_losses.npy", self.train_loss_hist)
-        np.save(f"{save_dir}/train_loss_intervlas.npy", self.train_loss_intervals)
+        np.save(f"{save_dir}/train_loss_intervlas.npy",
+                self.train_loss_intervals)
         np.save(f"{save_dir}/val_losses.npy", self.val_loss_histories)
         np.save(f"{save_dir}/val_loss_intervals.npy", self.k_loss_intervals)
         with open(f"{save_dir}/info.pkl", "wb") as f:
@@ -185,7 +186,7 @@ class Trainer(ABC):
         if self.callbacks:
             self.setup_callbacks(circuit_properties, eval_interval)
 
-        ### setup performance log
+        # setup performance log
         print(Colors.GREEN + "BEGINNING TRAINING" + Colors.RESET)
         self.best_performance_log = tqdm(
             total=0,
@@ -205,7 +206,8 @@ class Trainer(ABC):
 
         for i in range(self.k_folds):
             self.current_fold = i
-            train_ids, val_ids = train_data.split(self.train_size, validation_size)
+            train_ids, val_ids = train_data.split(
+                self.train_size, validation_size)
 
             train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
             train_loader = DataLoader(
@@ -309,13 +311,15 @@ class QuantumTrainer(Trainer):
     ) -> Tuple[qnp.ndarray, float]:
         loss_sample_batch = qnp.array(sample_batch, requires_grad=False)
         metric_sample_batch = qnp.array(sample_batch[0], requires_grad=False)
-        cost_fn = lambda p: loss_fn(
+
+        def cost_fn(p): return loss_fn(
             p,
             loss_sample_batch,
             model_fn,
             circuit_properties,
         )
-        metric_fn = lambda p: qml.metric_tensor(model_fn, approx="block-diag")(
+
+        def metric_fn(p): return qml.metric_tensor(model_fn, approx="block-diag")(
             p,
             metric_sample_batch,
             circuit_properties,
@@ -362,7 +366,8 @@ class QuantumTrainer(Trainer):
         val_data: np.ndarray,
         circuit_properties: dict,
     ) -> float:
-        loss = loss_fn(params, qnp.array(val_data[:][0]), model, circuit_properties)
+        loss = loss_fn(params, qnp.array(
+            val_data[:][0]), model, circuit_properties)
 
         return loss
 
@@ -468,7 +473,8 @@ class ClassicalTrainer(Trainer):
             self.best_params = params
 
         if prune:
-            val_idx = np.int(np.floor(prune["update_end_step"] / self.eval_interval))
+            val_idx = np.int(
+                np.floor(prune["update_end_step"] / self.eval_interval))
             if (i > 0) & (np.all(loss < self.val_loss_histories[val_idx:])):
                 self.best_performance_log.set_description_str(
                     f"Best Model saved at step: {i}, loss: {loss}"

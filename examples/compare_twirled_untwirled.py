@@ -13,7 +13,7 @@ from src.utils import loss_dict
 from examples.basic_example import plot_metrics_from_runs, experiment_on_simple_data
 import itertools
 from sklearn.metrics import roc_curve
-from utils import SymmetricDatasetJax
+from data.datasets import SymmetricDatasetJax
 from time import time
 
 # TODO: TURN INTO A RAY STUDY WITH MORE EPOCHS, LAYERS, DATA (CLUSTER + JIT)

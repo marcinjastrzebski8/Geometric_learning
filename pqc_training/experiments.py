@@ -4,14 +4,14 @@ import subprocess
 from circuits import fidelity_circuit, ansatz_dict, embedding_dict, model_dict
 from losses import loss_dict
 import h5py
-from utils import setup_save_dir
+from examples.utils import setup_save_dir
 from classical_models import original_autoencoder as autoencoder
 from classical_models import mse
 import haiku as hk
 import jax
 import optax
 import dill
-from utils import (
+from examples.utils import (
     weight_init,
     DynamicEntanglement,
     EntanglementEntropy,
@@ -160,12 +160,14 @@ class Experiment:
         config["model_fn"] = hk.without_apply_rng(hk.transform(model))
 
         config["loss_fn"] = classical_loss_dict[config["loss"]]
-        config["optimiser_fn"] = getattr(optax, config["optimiser"])(config["lr"])
+        config["optimiser_fn"] = getattr(
+            optax, config["optimiser"])(config["lr"])
         return config
 
     def save_experiment_losses(self, losses_dir):
         # might need to change if only one classical model needed
-        experiment_losses = h5py.File(f"{losses_dir}/experiment_losses.h5", "w")
+        experiment_losses = h5py.File(
+            f"{losses_dir}/experiment_losses.h5", "w")
         key = list(self.independent_var.keys())[0]
         var_list_len = len(self.independent_var[key])
         var_set_len = len(set(self.independent_var[key]))
@@ -210,7 +212,8 @@ class Experiment:
                     )
 
     def construct_classical_training_dict(self, train_data, var, key):
-        save_dir = setup_save_dir(self.config, self.config["save_dir"] + "/classical")
+        save_dir = setup_save_dir(
+            self.config, self.config["save_dir"] + "/classical")
         self.c_config = self.update_classical_config(self.c_config, key, var)
 
         init_params = self.c_config["model_fn"].init(
@@ -248,7 +251,8 @@ class Experiment:
             param_shape,
         )
 
-        save_dir = setup_save_dir(self.config, self.config["save_dir"] + "/quantum")
+        save_dir = setup_save_dir(
+            self.config, self.config["save_dir"] + "/quantum")
 
         training_params = {
             "train_data": train_data,
@@ -340,9 +344,11 @@ class Experiment:
 
             c_params, _, _ = self.c_trainer.train(**classical_training_params)
 
-            q_tester = QuantumTester(model_fn, loss_fn, q_params, self.q_config)
+            q_tester = QuantumTester(
+                model_fn, loss_fn, q_params, self.q_config)
 
-            c_tester = ClassicalTester(classical_model, classical_loss, c_params)
+            c_tester = ClassicalTester(
+                classical_model, classical_loss, c_params)
 
             bg_fold_losses, sg_fold_losses = self.k_fold_testing(
                 q_tester,
@@ -364,7 +370,8 @@ class Experiment:
             self.test_bgc_loss.append(bgc_fold_losses)
             self.test_sgc_loss.append(sgc_fold_losses)
 
-        parameters_file = open(f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
+        parameters_file = open(
+            f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
         yaml.dump(self.config, parameters_file)
         yaml.dump(self.c_config, parameters_file)
         yaml.dump(self.q_config, parameters_file)
@@ -398,7 +405,8 @@ class Experiment:
         for i in range(num_of_experiments):
             changes = self.independent_var["changes"]
             if "transform" in changes:
-                permutation = np.arange(int(2 * self.config["data"]["latent_rep"]))
+                permutation = np.arange(
+                    int(2 * self.config["data"]["latent_rep"]))
                 np.random.shuffle(permutation)
                 new_data_config = original_data_config.copy()
                 new_data_config["transform"] = Permute(permutation)
@@ -487,7 +495,8 @@ class Experiment:
             f.write(item + "\n")
         f.close()
 
-        parameters_file = open(f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
+        parameters_file = open(
+            f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
         self.config["experiment_var"]["permutations"] = permutation_list
         yaml.dump(self.config, parameters_file)
         yaml.dump(self.c_config, parameters_file)
@@ -533,7 +542,8 @@ class Experiment:
         time.sleep(10)
         print("now we wait!")
         while completed_runs < num_of_experiments:
-            f = open(f"{self.experiment_dir}/temps/completed_test_runs.txt", "r")
+            f = open(
+                f"{self.experiment_dir}/temps/completed_test_runs.txt", "r")
             contents = f.readlines()
             completed_runs = len(contents)
             print(f"runs completed: {completed_runs}")
@@ -630,7 +640,8 @@ class Experiment:
             f.write(item + "\n")
         f.close()
 
-        parameters_file = open(f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
+        parameters_file = open(
+            f"{str(self.experiment_dir)}/experiment_setup.yaml", "w")
         yaml.dump(self.config, parameters_file)
         yaml.dump(self.c_config, parameters_file)
         yaml.dump(self.q_config, parameters_file)
@@ -679,7 +690,8 @@ class Experiment:
         time.sleep(10)
         print("now we wait!")
         while completed_runs < len(self.independent_var[key]):
-            f = open(f"{self.experiment_dir}/temps/completed_test_runs.txt", "r")
+            f = open(
+                f"{self.experiment_dir}/temps/completed_test_runs.txt", "r")
             contents = f.readlines()
             completed_runs = len(contents)
             print(f"runs completed: {completed_runs}")
@@ -898,7 +910,8 @@ class Experiment:
 
 def get_roc_data(bg_loss, sg_loss):
     """We have to interpolate to assert x coordinates between folds match"""
-    labels = np.concatenate((np.zeros(bg_loss.shape[0]), np.ones(sg_loss.shape[0])))
+    labels = np.concatenate(
+        (np.zeros(bg_loss.shape[0]), np.ones(sg_loss.shape[0])))
     preds = np.concatenate((bg_loss, sg_loss))
     fpr, tpr, _ = roc_curve(labels, preds, drop_intermediate=False)
 
@@ -958,13 +971,15 @@ class ExperimentPlotter:
             tpr_c = []
 
             for j in range(self.k_folds):
-                fq_q, tq_q = get_roc_data(self.bg_loss[i][j], self.sg_loss[i][j])
+                fq_q, tq_q = get_roc_data(
+                    self.bg_loss[i][j], self.sg_loss[i][j])
 
                 auc_q.append(auc(fq_q, tq_q))
                 fpr_q.append(fq_q)
                 tpr_q.append(tq_q)
 
-                fq_c, tq_c = get_roc_data(self.bgc_loss[i][j], self.sgc_loss[i][j])
+                fq_c, tq_c = get_roc_data(
+                    self.bgc_loss[i][j], self.sgc_loss[i][j])
 
                 auc_c.append(auc(fq_c, tq_c))
                 fpr_c.append(fq_c)
@@ -1168,7 +1183,8 @@ class ExperimentPlotter:
             c_experiment_ids = ["shallow network", "deep network"]
 
         q_experiment_ids = ["original ansatz", "new ansatz"]
-        c_experiment_ids = ["neural network"]  # ["shallow network", "deep network"]
+        # ["shallow network", "deep network"]
+        c_experiment_ids = ["neural network"]
 
         fig, ax = plt.subplots(1, figsize=(8, 5))
         styles = ["solid", "dashed"]
@@ -1282,7 +1298,8 @@ class ExperimentPlotter:
             ax.plot(
                 tpr_means[i],
                 fpr_means[i],
-                label=f"{id_name}: Q {np.round(auc_means[i],3)}+/-{np.round(auc_errs[i],4)}",
+                label=f"{id_name}: Q {
+                    np.round(auc_means[i], 3)}+/-{np.round(auc_errs[i], 4)}",
                 linewidth=1.5,
                 color=palette[i],
                 linestyle=linestyle,
@@ -1298,8 +1315,8 @@ class ExperimentPlotter:
             )
             model_legend.append(
                 f"{id_name} "
-                f"auc score: {np.round(auc_means[i],3)}"
-                f"± {np.round(auc_errs[i],4)}"
+                f"auc score: {np.round(auc_means[i], 3)}"
+                f"± {np.round(auc_errs[i], 4)}"
             )
         return ax, model_legend
 
@@ -1346,7 +1363,8 @@ class ExperimentPlotter:
             tpr_q = []
 
             for j in range(self.k_folds):
-                fq_q, tq_q = get_roc_data(self.bg_loss[i][j], self.sg_loss[i][j])
+                fq_q, tq_q = get_roc_data(
+                    self.bg_loss[i][j], self.sg_loss[i][j])
 
                 auc_q.append(auc(fq_q, tq_q))
                 fpr_q.append(fq_q)
@@ -1389,7 +1407,8 @@ class ExperimentPlotter:
             tpr_c = []
 
             for j in range(self.k_folds):
-                fq_c, tq_c = get_roc_data(self.bgc_loss[i][j], self.sgc_loss[i][j])
+                fq_c, tq_c = get_roc_data(
+                    self.bgc_loss[i][j], self.sgc_loss[i][j])
 
                 auc_c.append(auc(fq_c, tq_c))
                 fpr_c.append(fq_c)
@@ -1599,7 +1618,8 @@ class ExperimentPlotter:
         )
 
         legend3 = ax.legend(
-            [lines[len(self.q_palette) + i] for i in range(len(self.c_palette))],
+            [lines[len(self.q_palette) + i]
+             for i in range(len(self.c_palette))],
             c_legend,
             loc="upper left",
             frameon=True,
@@ -1650,7 +1670,8 @@ class ExperimentPlotter:
             ax.plot(
                 tpr_means[i],
                 fpr_means[i],
-                label=f"{id_name}: {np.round(auc_means[i],3)}+/-{np.round(auc_errs[i],4)}",
+                label=f"{id_name}: {
+                    np.round(auc_means[i], 3)}+/-{np.round(auc_errs[i], 4)}",
                 linewidth=1.5,
                 color=palette[i],
                 linestyle=linestyle,
@@ -1666,7 +1687,7 @@ class ExperimentPlotter:
             )
             model_legend.append(
                 f"{id_name}: "
-                f"{np.round(auc_means[i],3)}"
+                f"{np.round(auc_means[i], 3)}"
                 # f"±{np.round(auc_errs[i],4)}"
             )
         return ax, model_legend
@@ -1696,7 +1717,8 @@ def train(config, q_config, c_config):
     q_trainer = QuantumTrainer(k_folds=config["k_folds"])
     c_trainer = ClassicalTrainer(k_folds=config["k_folds"])
 
-    experiment_dir = setup_experiment_results_dir(config["dataset"], config["save_dir"])
+    experiment_dir = setup_experiment_results_dir(
+        config["dataset"], config["save_dir"])
     print("Experiment!", experiment_dir)
 
     train_size_experiment = Experiment(
@@ -1739,7 +1761,8 @@ def test(config, q_config, c_config, distribued=True):
         experiment.distributed_testing()
         # experiment.collate_test_results()
 
-        losses_dir = get_experiment_results_dir(config["dataset"], config["save_dir"])
+        losses_dir = get_experiment_results_dir(
+            config["dataset"], config["save_dir"])
 
         key = list(config["experiment_var"].keys())[0]
         ids = [str(i) for i in config["experiment_var"][key]]
@@ -1762,7 +1785,8 @@ def test(config, q_config, c_config, distribued=True):
         experiment_plotter.plot_performance(f"{losses_dir}/roc.pdf", 2, 1)
 
     else:
-        losses_dir = get_experiment_results_dir(config["dataset"], config["save_dir"])
+        losses_dir = get_experiment_results_dir(
+            config["dataset"], config["save_dir"])
 
         key = list(config["experiment_var"].keys())[0]
         ids = [str(i) for i in config["experiment_var"][key]]

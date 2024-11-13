@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 import matplotlib.pyplot as plt
 
-from utils import get_model_names_from_wandb, get_best_config_and_params_from_run
+from examples.utils import get_model_names_from_wandb, get_best_config_and_params_from_run
 
 api = wandb.Api()
 
@@ -16,7 +16,6 @@ api = wandb.Api()
 def validate_ray_models(json_config, n_models_to_keep, test_dict):
     """
     Given a ray run and some metadata, check performance of the best found models on some test data.
-    TODO: need to build the param-saving part of the pipeline (should look like a trainer class) for nn.module-like models
     """
     path_to_ray_models = Path('ray_runs') / json_config['output_models_dir']
     models_w_losses = get_model_names_from_wandb(

@@ -21,7 +21,7 @@ from pathlib import Path
 import ray
 from ray import train as ray_train
 from ray import tune
-from utils import SymmetricDatasetJax
+from data.datasets import SymmetricDatasetJax
 from jax.example_libraries import optimizers
 import numpy as np
 from src.geometric_classifier import GeometricClassifierAutotwirlJax, BasicClassifier

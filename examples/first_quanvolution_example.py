@@ -21,7 +21,7 @@ try:
     from src.geometric_classifier import BasicClassifierTorch
     from src.ansatze import SimpleAnsatz1
     from pqc_training.trainer import TorchQMLTrainer
-    from utils import SymmetricDataset
+    from data.datasets import SymmetricDataset
 
     def mnist_prep():
         """
