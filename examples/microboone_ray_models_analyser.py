@@ -26,9 +26,8 @@ def validate_ray_models(json_config, n_models_to_keep, test_dict):
     fig, ax = plt.subplots(1, 1)
 
     for model_name_and_loss in best_models:
-        # TODO: THIS WILL HAVE TO BE ADAPTED TO NEW WAY OF DUMPING PARAMS
         best_config, best_params = get_best_config_and_params_from_run(
-            model_name_and_loss[0], path_to_ray_models)
+            model_name_and_loss[0], path_to_ray_models, True)
         model_name = model_name_and_loss[0]
         model = json_config['architecture']
         model.load_state_dict(best_params)

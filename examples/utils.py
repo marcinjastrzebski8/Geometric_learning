@@ -1,8 +1,9 @@
-
-import pandas as pd
 import os
 import re
 from pathlib import Path
+
+import pandas as pd
+import torch
 
 
 def match_run_dir(model_name, path_to_saved_results):
@@ -30,6 +31,11 @@ def find_latest_checkpoint_dir(run_path):
 
 
 def get_best_config_and_params_from_run(model_name, path_to_saved_results, state_dict_saved=False):
+    """
+    best_params is a pandas object [Series?] if state_dict_saved == False
+    Otherwise it is a torch.state_dict() object [just a dict?]
+    best_config is always a pandas object
+    """
     # e.g. some_model_2a34
     print(model_name)
     # NOTE: I didn't need the best models dir last time - not sure what changed
@@ -38,12 +44,13 @@ def get_best_config_and_params_from_run(model_name, path_to_saved_results, state
         path_to_saved_results / run_dir)  # e.g. checkpoint_000010
     if state_dict_saved:
         best_params_dir = run_dir/checkpoint_dir/'model_state.pth'
+        best_params = torch.load(best_params_dir)
     else:
         best_params_dir = path_to_saved_results / \
             run_dir / checkpoint_dir / 'params.pkl'
         best_params = pd.read_pickle(best_params_dir)
-        best_config_pkl = Path(best_params_dir).parent.parent/'params.pkl'
-        best_config = pd.read_pickle(best_config_pkl)
+    best_config_pkl = Path(best_params_dir).parent.parent/'params.pkl'
+    best_config = pd.read_pickle(best_config_pkl)
 
     return best_config, best_params
 
