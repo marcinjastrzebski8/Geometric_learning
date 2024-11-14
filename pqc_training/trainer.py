@@ -21,6 +21,7 @@ import tempfile
 import jax
 import jax_dataloader as jdl
 from jax import numpy as jnp
+from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score
 
 
 def model_predictions_for_jit(params, features, encoder, properties):
@@ -827,24 +828,42 @@ class NewTrainer():
         self.epochs = epochs
         self.eval_interval = eval_interval
         self.save_dir = save_dir
-        # use these if not saving with ray
+
         self.val_loss_histories = np.full((self.k_folds, int(
             (self.epochs/self.eval_interval)+1)), np.inf)
         self.train_loss_histories = np.full(
             (self.k_folds, self.epochs + 1), np.inf)
+
+        self.val_acc_histories = np.zeros((self.k_folds, int(
+            (self.epochs/self.eval_interval)+1)))
 
     def save_model(self, model, save_dir):
         with open(f"{str(save_dir)}/model_state.pth", "wb") as f:
             torch.save(model.state_dict(), f)
 
     def save_losses(self, save_dir):
-        np.save(f"{save_dir}/train_losses.npy", self.train_loss_hist)
+        np.save(f"{save_dir}/train_losses.npy", self.train_loss_histories)
         np.save(f"{save_dir}/val_losses.npy", self.val_loss_histories)
 
+    def compute_acc(self, dataset, outputs):
+        fpr, tpr, thresholds = roc_curve(
+            dataset[1].detach().numpy(), outputs.detach().numpy())
+        # pick best threshold giving equal value to tpr and -fpr
+        threshold_id = np.argmax(tpr-fpr)
+        threshold = thresholds[threshold_id]
+        labels_predicted = [0 if output <
+                            threshold else 1 for output in outputs]
+        acc = accuracy_score(dataset[1], labels_predicted)
+        return acc
+
     def validate(self, model, validation_dataset, criterion):
+        """
+        At the moment looking at loss and accuracy. Other metrics could be introduced simply.
+        """
         outputs = model(validation_dataset[0]).view(-1)
         val_loss = criterion(outputs, validation_dataset[1])
-        return val_loss.item()
+        acc = self.compute_acc(validation_dataset, outputs)
+        return val_loss.item(), acc
 
     def train(self,
               model,
@@ -855,7 +874,8 @@ class NewTrainer():
               validation_size: int,
               batch_size: int,
               standalone_val_dataset: Optional[Dataset] = None,
-              use_ray=False):
+              use_ray=False,
+              reporting_mode='train'):
         """
         Allows for k-fold validation training.
         If k is set to 1 but validation is desired, a separate standalone validation dataset can be passed.
@@ -879,7 +899,7 @@ class NewTrainer():
             train_loader = DataLoader(
                 train_data, batch_size=int(batch_size))
             self.train_loop(model, train_loader, val_data,
-                            optimizer, criterion, use_ray)
+                            optimizer, criterion, use_ray, reporting_mode)
 
     def train_loop(self,
                    model,
@@ -887,7 +907,8 @@ class NewTrainer():
                    val_data,
                    optimizer,
                    criterion,
-                   use_ray):
+                   use_ray,
+                   reporting_mode):
         """
         Loop over epochs and batches.
         Assumes loss (criterion) which averages over batch.
@@ -907,21 +928,32 @@ class NewTrainer():
             epoch_loss = running_loss/len(train_loader.dataset)
 
             if i % self.eval_interval == 0:
+
                 # validate
                 if val_data is not None:
-                    val_loss = self.validate(model, val_data, criterion)
+                    val_loss, val_acc = self.validate(
+                        model, val_data, criterion)
                 else:
-                    val_loss = 0
+                    val_loss = val_acc = 0
 
-                # model states are saved when training loss becomes smallest in history
-                # NOTE: this might not be the best strategy
                 # report losses to ray
                 if use_ray:
                     with tempfile.TemporaryDirectory() as tempdir:
-                        if np.all(epoch_loss < self.train_loss_histories):
+                        # save when train loss smallest
+                        if reporting_mode == 'train':
+                            condition = np.all(
+                                epoch_loss < self.train_loss_histories)
+                        # save when validation accuracy highest
+                        elif reporting_mode == 'val':
+                            condition = np.all(
+                                val_acc > self.val_acc_histories)
+                        else:
+                            raise ValueError(
+                                'reporting mode should be train or val but given ', reporting_mode)
+                        if condition:
                             self.save_model(model, tempdir)
                         ray_train.report(
-                            metrics={'loss': epoch_loss, 'val_loss': val_loss}, checkpoint=Checkpoint.from_directory(tempdir))
+                            metrics={'loss': epoch_loss, 'val_loss': val_loss, 'val_acc': val_acc}, checkpoint=Checkpoint.from_directory(tempdir))
                 # report losses locally
                 else:
                     if np.all(epoch_loss < self.train_loss_histories):
@@ -934,3 +966,5 @@ class NewTrainer():
                 self.val_loss_histories[
                     self.current_fold, int(i / self.eval_interval)
                 ] = val_loss
+                self.val_acc_histories[self.current_fold,
+                                       int(i / self.eval_interval)] = val_acc
