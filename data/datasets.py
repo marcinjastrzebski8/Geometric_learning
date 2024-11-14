@@ -101,7 +101,8 @@ def make_mock_showers(num_data, random_seed, image_length, w_symmetry=False):
                 image.reshape(image_length, image_length)).reshape(image_length*image_length)
     return data
 
-
+#NOTE: can these three classes be obtained with less code? I need each to be a class but so much of the code repeats!
+#templates??
 class MicrobooneTrainData(Dataset):
 
     def __init__(self):
@@ -163,6 +164,35 @@ class MicrobooneValData(Dataset):
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
 
+class MicrobooneTestData(Dataset):
+
+    def __init__(self):
+        data = torch.load(
+            path_to_datasets/'microboone_from_callum/test_data.pt')
+        # add the channel dimension
+        self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
+        self.labels = torch.load(
+            path_to_datasets/'microboone_from_callum/test_labels.pt')
+        self.shape = self.data.shape
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        label = self.labels[idx]
+
+        return sample, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
 
 class SymmetricDataset(Dataset):
     def __init__(self, size, image_length):
@@ -261,3 +291,6 @@ class SimpleSymmetricDataset(Dataset):
         val_idx = np.random.choice(
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
+
+#TODO: COMPLETE THIS
+dataset_lookup = {'MicrobooneTestData':MicrobooneTestData}

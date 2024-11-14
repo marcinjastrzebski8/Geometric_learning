@@ -44,7 +44,7 @@ api = wandb.Api()
 path_to_package = Path('.').absolute()
 
 
-def train_model(model, dataset, criterion, optimizer, epochs, batch_size=500, val_dataset=None):
+def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_dataset=None):
     """
     This changed from first study script to utilise the new trainer class.
     """
@@ -129,7 +129,7 @@ def main(json_config):
         optimiser = optim.Adam(model.parameters(), lr=config['lr'])
         # TODO: CHECK HOW MANY EPOCHS CALLUM DID
         train_model(model, MicrobooneTrainData(), criterion,
-                    optimiser, json_config['n_epochs'], val_dataset=MicrobooneValData())
+                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=MicrobooneValData()[:])
 
     # search space params
     lr = tune.loguniform(0.001, 0.1)
