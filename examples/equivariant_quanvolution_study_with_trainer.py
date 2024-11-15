@@ -63,7 +63,7 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_da
                   0,
                   batch_size,
                   val_dataset,
-                  True, 
+                  True,
                   'val')
 
 
@@ -80,27 +80,27 @@ def main(json_config):
         def prep_equiv_quanv_model(is_first_layer):
             n_layers = config['n_layers']
             n_reuploads = config['n_reuploads']
-            # CHANGE TO CALLUM ANSATZ ONCE HE SENDS DETAILS
             patch_circuit = BasicClassifierTorch(feature_map='RotEmbedding',
                                                  ansatz=MatchCallumAnsatz,
                                                  size=4,
                                                  n_reuploads=n_reuploads)
             patch_circuit_properties = {
                 'n_layers': n_layers, 'ansatz_block': [RY, RZ], 'embedding_pauli': RX}
-            # both layers take same size in because we'll use stride=1
 
             if is_first_layer:
                 input_channel_side_len = json_config['image_size']
-                quantum_circs = [patch_circuit]
-                quantum_circs_properties = [patch_circuit_properties]
+                quantum_circs = [
+                    patch_circuit for i in range(config['n_filters0'])]
+                quantum_circs_properties = [
+                    patch_circuit_properties for i in range(config['n_filters0'])]
 
             else:
                 # NOTE: this is hardcoded based on filter size and stride - im sure there's a general formula
                 input_channel_side_len = json_config['image_size'] - 1
-                # using the same ansatz for each pose
-                quantum_circs = [patch_circuit for i in range(4)]
-                quantum_circs_properties = [patch_circuit_properties
-                                            for i in range(4)]
+                quantum_circs = [
+                    patch_circuit for i in range(config['n_filters1'])]
+                quantum_circs_properties = [
+                    patch_circuit_properties for i in range(config['n_filters1'])]
 
             group_info = {'size': 4}
             # NOTE: parameter shape is kind of hardcoded, could do some lookup table based on ansatz
@@ -140,6 +140,7 @@ def main(json_config):
     n_layers = tune.choice([1, 2, 3, 4])
     dropout_bool = tune.choice([True, False])
     dropout_amount = tune.uniform(1e-4, 0.5)
+    n_filters = tune.choice([1, 2, 3, 4])
 
     search_space = {'lr': lr,
                     'dense_units': dense_units,
@@ -149,7 +150,9 @@ def main(json_config):
                     'use_dropout0': dropout_bool,
                     'use_dropout1': dropout_bool,
                     'dropout0': dropout_amount,
-                    'dropout1': dropout_amount}
+                    'dropout1': dropout_amount,
+                    'n_filters0': n_filters,
+                    'n_filters1': n_filters}
 
     scheduler = ASHAScheduler(
         time_attr='training_iteration', grace_period=5)

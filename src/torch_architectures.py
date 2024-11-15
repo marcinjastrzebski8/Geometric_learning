@@ -54,3 +54,14 @@ class ConvolutionalEQNEC(nn.Module):
 
 
 architectures_lookup = {'ConvolutionalEQNEC': ConvolutionalEQNEC}
+
+
+class ConvolutionalEQEQ(nn.Module):
+    def __init__():
+        super().__init__()
+        self.quanv0 = architecture_config['quanv0']
+        self.quanv1 = architecture_config['quanv1']
+        self.dropout0 = False
+        self.dropout1 = False
+        dense_shape_0 = architecture_config['dense_units'][0]
+        dense_shape_1 = architecture_config['dense_units'][1]

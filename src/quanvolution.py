@@ -216,6 +216,7 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                 quantum_filter, weight_shapes, init_method=init_method) for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
         else:
             # this is a bit messy...
+            # using the same ansatz for each pose
             quantum_filters = [
                 [quantum_circ.prediction_circuit(quantum_circ_properties) for i in range(self.group['size'])] for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
             self.torch_layers = [[qml.qnn.TorchLayer(
