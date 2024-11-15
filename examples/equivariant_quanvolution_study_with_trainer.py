@@ -63,7 +63,8 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_da
                   0,
                   batch_size,
                   val_dataset,
-                  True)
+                  True, 
+                  'val')
 
 
 def main(json_config):
