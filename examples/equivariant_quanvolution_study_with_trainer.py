@@ -155,7 +155,7 @@ def main(json_config):
                     'n_filters1': n_filters}
 
     scheduler = ASHAScheduler(
-        time_attr='training_iteration', grace_period=5)
+        time_attr='training_iteration', grace_period=5, metric = 'val_acc', mode = 'max')
 
     # set up ray with weights and biases logging
     ray.init(num_cpus=json_config['n_cpus'])
