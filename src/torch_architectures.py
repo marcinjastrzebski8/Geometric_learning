@@ -57,11 +57,25 @@ architectures_lookup = {'ConvolutionalEQNEC': ConvolutionalEQNEC}
 
 
 class ConvolutionalEQEQ(nn.Module):
-    def __init__():
+    """
+    EQ -> EQ architecture with two quanvolutional layers and a single quantum classifier of variable length.
+    """
+
+    def __init__(self, architecture_config):
         super().__init__()
         self.quanv0 = architecture_config['quanv0']
         self.quanv1 = architecture_config['quanv1']
-        self.dropout0 = False
-        self.dropout1 = False
-        dense_shape_0 = architecture_config['dense_units'][0]
-        dense_shape_1 = architecture_config['dense_units'][1]
+        self.quantum_classifier = architecture_config['quanutm_classifier']
+
+    def forward(self, x):
+        # NOTE: Callum is using batch normalisation here which is not equivariant by default,
+        # could use the escnn package to do that if needed
+        x = nn.functional.relu(self.quanv0(x))
+        x = nn.functional.relu(self.quanv1(x))
+        x = x.permute(1, 0, 2, 3, 4)
+        x = torch.flatten(x, 1)
+        x = self.quantum_classifier(x)
+
+
+class ConvolutionalECEQ(nn.Module):
+    pass

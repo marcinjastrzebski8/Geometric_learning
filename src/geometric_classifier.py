@@ -1,10 +1,14 @@
 """
 Simple model which can be made to respect the D_4 symmetry.
 """
+import functools
 from src.utils import circuit_dict
 from src.twirling import twirl_an_ansatz
 import pennylane as qml
 from typing import Sequence
+import torch
+from torch import nn
+import math
 
 
 # NOTE: when the Operation class is called via its init, it uses compute_decomposition implicitly
@@ -85,7 +89,7 @@ class BasicClassifier():
 class BasicClassifierTorch():
     """
     Same as BasicClassifier but few minor changes to be compatible with pytorch/pennylane interface.
-    NOTE: expanded to allow for reuploading circuits. Should reflect in name. Need to check if works.
+    NOTE: expanded to allow for reuploading circuits. 
     """
 
     def __init__(self, feature_map: str, ansatz, size: int, measurement=qml.PauliZ(0), n_reuploads: int = 1):
@@ -113,3 +117,25 @@ class BasicClassifierTorch():
             return qml.expval(self.measurement)
         # output changed to just the function, not the function call
         return qnode
+
+
+class BasicModelTorchLayer(nn.Module):
+    """
+    Same as BasicClassifierTorch but now a nn.Module.
+    This done for full compatibility with torch training.
+    """
+
+    def __init__(self,
+                 basic_model: BasicClassifierTorch,
+                 weight_shapes: dict,
+                 weights_init_max_val: float = 2*math.pi):
+
+        super().__init__()
+        init_method = functools.partial(
+            torch.nn.init.uniform_, b=weights_init_max_val)
+
+        self.basic_model = qml.qnn.TorchLayer(
+            basic_model, weight_shapes, init_method=init_method)
+
+    def forward(self, x):
+        return self.basic_model(x)
