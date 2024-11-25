@@ -164,8 +164,7 @@ def main(json_config):
     run_config = ray_train.RunConfig(storage_path=path_to_package, name=json_config['output_models_dir'], callbacks=[
         WandbLoggerCallback(project=json_config['output_models_dir'])], checkpoint_config=ray_train.CheckpointConfig(
         checkpoint_score_attribute='loss'))
-    tuner = tune.Tuner(trainable_with_resources, param_space=search_space, tune_config=tune.TuneConfig(
-        metric='loss', mode='min', num_samples=json_config['n_models'], scheduler=scheduler), run_config=run_config)
+    tuner = tune.Tuner(trainable_with_resources, param_space=search_space, tune_config=tune.TuneConfig(num_samples=json_config['n_models'], scheduler=scheduler), run_config=run_config)
     tuner.fit()
 
     train_ray(json_config)
