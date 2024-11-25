@@ -53,35 +53,37 @@ def get_best_config_and_params_from_run(model_name, path_to_saved_results, check
     return best_config, best_params
 
 
-def get_model_names_from_wandb(api, project_name, which_loss_to_choose: int | str):
+def get_model_names_from_wandb(api, project_name, metric_name, which_metric_to_choose: int | str):
     """
     Not converged on best way to access training info yet. Exploring options.
     """
-    models_w_losses = {}
+    models_w_metrics = {}
     for run in api.runs(f"ucl_hep_q_mj/{project_name}"):
         if run.state == 'finished':
-            # get last loss obtained during hyperopt
             try:
-                losses = run.history().loss.tolist()
+                metrics = run.history()[metric_name].tolist()
                 #user specifies exactly the point of train history to look at (same for all models)
-                if isinstance(which_loss_to_choose, int):
-                    loss = losses[which_loss_to_choose]
-                    checkpoint_id = which_loss_to_choose
-                #user looks for smallest loss achieved during training
-                elif which_loss_to_choose == 'min':
-                    loss = min(losses)
-                    checkpoint_id = losses.index(min(losses))
-                #user looks at last loss during training
-                elif which_loss_to_choose == 'last':
-                    loss = losses[-1]
-                    checkpoint_id = len(losses) - 1
+                if isinstance(which_metric_to_choose, int):
+                    metric = metrics[which_metric_to_choose]
+                    checkpoint_id = which_metric_to_choose
+                #user looks for smallest/largest metric achieved during training
+                elif which_metric_to_choose == 'min':
+                    metric = min(metrics)
+                    checkpoint_id = metrics.index(min(metrics))
+                elif which_metric_to_choose == 'max':
+                    metric = max(metrics)
+                    checkpoint_id = metrics.index(max(metrics))
+                #user looks at last metric during training
+                elif which_metric_to_choose == 'last':
+                    metric = metrics[-1]
+                    checkpoint_id = len(metrics) - 1
                 else:
                     raise ValueError('which_loss_to_choose should be an int or one of (\'min\', \'last\')')
                 model = run.name
-                models_w_losses[f'{model}'] = [loss, checkpoint_id]
+                models_w_metrics[f'{model}'] = [metric, checkpoint_id]
             except (AttributeError, ValueError) as e:
                 print(e)
 
-    print(models_w_losses)
+    print(models_w_metrics)
 
-    return models_w_losses
+    return models_w_metrics
