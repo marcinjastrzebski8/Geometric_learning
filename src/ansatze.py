@@ -76,7 +76,7 @@ class MatchCallumAnsatz(Operation):
 
     def __init__(self, params, wires=None, config=None):
         self._hyperparameters = {'n_layers': config['n_layers'],
-        'ansatz_block': config['ansatz_block']}
+                                 'ansatz_block': config['ansatz_block']}
         super().__init__(params, wires)
 
     @staticmethod
@@ -197,7 +197,6 @@ class GeometricAnsatzConstructor(Operation):
         """
         Allows to create any ansatz of the (1local-2local) x n_layers shape
         """
-        # TODO: CLEAN THIS UP I WASNT SURE IF I CAN DEFINE VARIABLES WITHOUT THEM BEING ADDED TO THE QUEUE
         group_equiv_1local_gate = hyperparams['group_equiv_1local_gate']
         group_equiv_2local_gate = hyperparams['group_equiv_2local_gate']
         gate_1local_instructions = hyperparams['gate_1local_instructions']
@@ -206,16 +205,17 @@ class GeometricAnsatzConstructor(Operation):
         n_1local_gates = len(gate_1local_instructions)
         n_2local_gates = len(gate_2local_instructions)
         assert np.shape(*params) == (n_layers,
-                                     len(hyperparams['gate_1local_instructions'])+len(hyperparams['gate_2local_instructions']))
-
+                                     n_1local_gates+n_2local_gates)
+        # the unpacking adds an extra dimension which is spurious
+        params = params[0]
         op_list = []
         for layer_id in range(n_layers):
-            for gate_id, gate_1local_instruction in enumerate(hyperparams['gate_1local_instructions']):
-                op_list.append(hyperparams['group_equiv_1local_gate'](
-                    params[0][layer_id][gate_id], config=gate_1local_instruction))
+            for gate_id, gate_1local_instruction in enumerate(gate_1local_instructions):
+                op_list.append(group_equiv_1local_gate(
+                    params[layer_id][gate_id], config=gate_1local_instruction))
 
-            for gate_id, gate_2local_instruction in enumerate(hyperparams['gate_2local_instructions']):
-                op_list.append(hyperparams['group_equiv_2local_gate'](params[0][layer_id][len(
-                    hyperparams['gate_1local_instructions'])+gate_id], config=gate_2local_instruction))
+            for gate_id, gate_2local_instruction in enumerate(gate_2local_instructions):
+                op_list.append(group_equiv_2local_gate(
+                    params[layer_id][n_1local_gates+gate_id], config=gate_2local_instruction))
 
         return op_list

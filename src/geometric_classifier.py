@@ -127,6 +127,7 @@ class BasicModelTorchLayer(nn.Module):
 
     def __init__(self,
                  basic_model: BasicClassifierTorch,
+                 circuit_properties: dict,
                  weight_shapes: dict,
                  weights_init_max_val: float = 2*math.pi):
 
@@ -135,7 +136,7 @@ class BasicModelTorchLayer(nn.Module):
             torch.nn.init.uniform_, b=weights_init_max_val)
 
         self.basic_model = qml.qnn.TorchLayer(
-            basic_model, weight_shapes, init_method=init_method)
+            basic_model.prediction_circuit(circuit_properties), weight_shapes, init_method=init_method)
 
     def forward(self, x):
         return self.basic_model(x)

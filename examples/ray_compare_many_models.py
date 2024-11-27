@@ -113,6 +113,7 @@ def main(json_config):
                         'gate_2local_placements': tune.choice(all_2local_placement_combinations_up_to_4_gates),
                         'gates': tune.choice(combos_for_1local_blocks),
                         'pauli_words': tune.choice(combos_for_2local_blocks),
+                        # maybe not the best way to ensure correct gate is used? - this is pretty much fixed by the group, right?
                         'group_equiv_1local_gate': tune.grid_search([C4On9QEquivGate1Local]),
                         'group_equiv_2local_gate': tune.grid_search([C4On9QEquivGate2Local])
                         }
