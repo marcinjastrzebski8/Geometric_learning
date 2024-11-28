@@ -31,7 +31,7 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.train import Checkpoint
 import torch
 from torch import nn, optim
-from pennylane import RX, RY, RZ
+from pennylane import RX, RY, RZ, PauliZ
 
 from src.quanvolution import EquivariantQuanvolution2DTorchLayer
 from src.geometric_classifier import BasicClassifierTorch, BasicModelTorchLayer
@@ -140,7 +140,8 @@ def prep_equiv_quant_classifier(config):
     circuit = BasicClassifierTorch(feature_map='RotEmbedding',
                                    ansatz=GeometricAnsatzConstructor,
                                    size=image_size,
-                                   n_reuploads=n_reuploads)
+                                   n_reuploads=n_reuploads, 
+                                   measurement = PauliZ(4))
     circuit_properties = {
         'n_layers': n_layers,
         'embedding_pauli': RX,
@@ -177,7 +178,8 @@ def main(json_config):
                                    'use_dropout0': config['use_dropout0'],
                                    'use_dropout1': config['use_dropout1'],
                                    'dropout0': config['dropout0'],
-                                   'dropout1': config['dropout1']}
+                                   'dropout1': config['dropout1'],
+                                   'n_filters1': config['n_filters1']}
             model = ConvolutionalEQNEC(architecture_config)
         elif architecture_codeword == 'EQEQ':
             architecture_config = {'quanv0': prep_equiv_quanv_model(config, json_config, True),
@@ -205,8 +207,10 @@ def main(json_config):
     if architecture_codeword[:2] == 'EQ':
         # hyperparams for the quanvolution layer
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
-        search_space['n_filters0'] = search_space['n_filters1'] = tune.choice([
-            1, 2, 3, 4])
+        search_space['n_filters0'] = tune.choice([
+            1, 2])
+        search_space['n_filters1'] = tune.choice([
+            1, 2, 3])
         search_space['n_reuploads'] = tune.choice([1,2,3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
