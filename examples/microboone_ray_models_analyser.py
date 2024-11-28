@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 import json
 
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score
 import wandb
 import torch
 from torch.utils.data import DataLoader
@@ -73,14 +73,16 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name:str):
     """
     Given a ray run and some metadata, check performance of the best found models on some test data.
     """
-    path_to_ray_models = Path('ray_runs') / json_config['output_models_dir']
+    output_models_dir = json_config['output_models_dir']
+    path_to_ray_models = Path('ray_runs') / output_models_dir
     models_w_losses = get_model_names_from_wandb(
-        api, json_config['output_models_dir'], 'val_acc', 'max')
+        api, output_models_dir, 'val_acc', 'max')
     best_models = sorted(models_w_losses.items(), key=lambda item: item[1][0], reverse = True)[
         :int(n_models_to_keep)]
 
     fig, ax = plt.subplots(1, 1)
     aucs = []
+    accs = []
     x_axes = []
     y_axes = []
 
@@ -113,19 +115,26 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name:str):
         outputs_gathered = np.array(outputs_gathered).flatten()
         labels_gathered = np.array(labels_gathered).flatten()
 
-        x_axis, y_axis, _ = roc_curve(labels_gathered, outputs_gathered)
-        x_axes.append(x_axis)
-        y_axes.append(y_axis)
+        fpr, tpr, thresholds = roc_curve(labels_gathered, outputs_gathered)
+        x_axes.append(fpr)
+        y_axes.append(tpr)
+        #find acc with best threshold assuming same weight for fpr and tpr
+        threshold_id = np.argmax(tpr-fpr)
+        threshold = thresholds[threshold_id]
+        labels_predicted = [0 if output <
+                            threshold else 1 for output in outputs_gathered]
+        acc = accuracy_score(labels_gathered, labels_predicted)
         auc = roc_auc_score(labels_gathered, outputs_gathered)
         aucs.append(auc)
+        accs.append(acc)
 
     df_dict = {'auc':aucs,
-        'x_axis': x_axes,
-        'y_axis': y_axes,
+        'acc':accs,
+        'fpr': x_axes,
+        'tpr': y_axes,
         'model': best_models}
     
-    #TODO: MAKE MORE ROBUST NAME
-    pd.DataFrame(df_dict).to_pickle('aucs_from_microboone_analysis')
+    pd.DataFrame(df_dict).to_pickle(f'microboone_analysis_{output_models_dir}')
     best_aucs = sorted(aucs, key=lambda item: item, reverse=True)[
         :int(10)]
     for auc, model_name_and_loss, x_axis, y_axis in zip(aucs, best_models, x_axes, y_axes):
@@ -135,7 +144,7 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name:str):
             auc_text = 'AUC: '+format(auc, '.3f')
             ax.plot(x_axis, y_axis, label=auc_text + ', '+ model_name)
     ax.legend()
-    figname = json_config['output_models_dir'] + '_best_models_rocs'
+    figname = output_models_dir + '_best_models_rocs'
     plt.savefig(figname, dpi=300)
 
 if __name__ == '__main__':

@@ -14,19 +14,9 @@ from pennylane import RY, RX
 from quanvolution import EquivariantQuanvolution2DTorchLayer, create_structured_patches
 from geometric_classifier import BasicClassifierTorch
 from ansatze import SimpleAnsatz0, SimpleAnsatz1
+from examples.utils import calculate_image_output_shape
 
 group_info = {'size': 4}
-
-
-def calculate_image_output_shape(image_size, kernel_size, stride):
-    """
-    ASSUMES SQUARE IMAGES AND NO PADDING ALLOWED.
-    """
-    output_size = (image_size - kernel_size)/stride + 1
-    if int(output_size) != output_size:
-        raise ValueError(
-            'Need (image_size-kernel_size)/stride to be an integer')
-    return int(output_size)
 
 
 def prep_first_layer_conv(n_output_filters, input_size, stride, kernel_size):

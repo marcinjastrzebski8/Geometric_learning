@@ -139,4 +139,5 @@ class BasicModelTorchLayer(nn.Module):
             basic_model.prediction_circuit(circuit_properties), weight_shapes, init_method=init_method)
 
     def forward(self, x):
+        print('Classifier getting shape: ', x.shape)
         return self.basic_model(x)

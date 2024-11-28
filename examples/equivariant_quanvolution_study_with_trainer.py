@@ -41,6 +41,7 @@ from src.torch_architectures import ConvolutionalEQNEC, ConvolutionalEQEQ
 from src.twirling import c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
 from pqc_training.trainer import NewTrainer
 from data.datasets import MicrobooneTrainData, MicrobooneValData
+from .utils import calculate_image_output_shape
 
 api = wandb.Api()
 path_to_package = Path('.').absolute()
@@ -89,14 +90,16 @@ def prep_equiv_quanv_model(config, json_config, is_first_layer):
             patch_circuit for i in range(config['n_filters0'])]
         quantum_circs_properties = [
             patch_circuit_properties for i in range(config['n_filters0'])]
+        stride = json_config['stride_quanv0']
 
     else:
-        # NOTE: this is hardcoded based on filter size and stride - im sure there's a general formula
-        input_channel_side_len = json_config['image_size'] - 1
+        #NOTE: ATM SIZE OF KERNEL HARDCODED (THROUGHOUT, NOT JUST THIS LINE)
+        input_channel_side_len = calculate_image_output_shape(json_config['image_size'], 2, json_config['stride_quanv0'])
         quantum_circs = [
             patch_circuit for i in range(config['n_filters1'])]
         quantum_circs_properties = [
             patch_circuit_properties for i in range(config['n_filters1'])]
+        stride = json_config['stride_quanv1']
 
     group_info = {'size': 4}
     # NOTE: parameter shape is kind of hardcoded, could do some lookup table based on ansatz
@@ -106,10 +109,10 @@ def prep_equiv_quanv_model(config, json_config, is_first_layer):
                                                       quantum_circs_properties,
                                                       (input_channel_side_len,
                                                        input_channel_side_len),
-                                                      1,
+                                                      stride,
                                                       2,
                                                       [{'params': (
-                                                          n_reuploads, n_layers, 4, 2)}],
+                                                          n_reuploads, n_layers, 4, 2)} for filter in quantum_circs],
                                                       config['param_init_max_vals'])
     return quanv_layer
 
@@ -204,7 +207,7 @@ def main(json_config):
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
         search_space['n_filters0'] = search_space['n_filters1'] = tune.choice([
             1, 2, 3, 4])
-        search_space['n_reuploads'] = tune.choice([1])
+        search_space['n_reuploads'] = tune.choice([1,2,3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
 
@@ -266,7 +269,7 @@ def main(json_config):
         search_space['classifier_n_reuploads'] = tune.choice([1])
 
     scheduler = ASHAScheduler(
-        time_attr='training_iteration', grace_period=5, metric='val_acc', mode='max')
+        time_attr='training_iteration', grace_period=5, metric='loss', mode='min')
 
     # set up ray with weights and biases logging
     ray.init(num_cpus=json_config['n_cpus'])

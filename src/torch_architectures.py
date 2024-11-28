@@ -66,6 +66,7 @@ class ConvolutionalEQEQ(nn.Module):
         self.quanv0 = architecture_config['quanv0']
         self.quanv1 = architecture_config['quanv1']
         self.quantum_classifier = architecture_config['quantum_classifier']
+        self.pooling = architecture_config['pooling']
 
     def forward(self, x):
         # NOTE: Callum is using batch normalisation here which is not equivariant by default,
@@ -73,7 +74,18 @@ class ConvolutionalEQEQ(nn.Module):
         x = nn.functional.relu(self.quanv0(x))
         x = nn.functional.relu(self.quanv1(x))
         x = x.permute(1, 0, 2, 3, 4)
-        x = torch.flatten(x, 1)
+
+        #average the group axis
+        x = x.mean(1)
+        #average the channels
+        x = x.mean(1)
+
+        print('just before pooling: ', x.shape)
+        if self.pooling:
+            #this hardcoded for 10x10->3x3 
+            x = nn.AvgPool2d(4, 3)(x)
+        #collapse the width and height
+        x = x.flatten(1)
         x = self.quantum_classifier(x)
         return x
 

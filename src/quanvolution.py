@@ -221,7 +221,12 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                 [quantum_circ.prediction_circuit(quantum_circ_properties) for i in range(self.group['size'])] for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
             self.torch_layers = [[qml.qnn.TorchLayer(
                 quantum_filter[i], weight_shapes, init_method=init_method) for i in range(self.group['size'])] for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
-
+        print('GOT TORCH LAYERS (FILTERS) ', len(self.torch_layers))
+        print(self.torch_layers)
+        print('quantum_circs', len(quantum_circs))
+        print('quantum_filters', len(quantum_filters))
+        print('properties', len(quantum_circs_properties))
+        print('weight_shapes', len(weight_shapes_list))
         self.bias = nn.Parameter(torch.ones(len(self.torch_layers))*0.1)
 
     def quantum_convolution(self, input_channel, torch_layer):

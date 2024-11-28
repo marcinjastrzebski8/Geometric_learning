@@ -87,3 +87,13 @@ def get_model_names_from_wandb(api, project_name, metric_name, which_metric_to_c
     print(models_w_metrics)
 
     return models_w_metrics
+
+def calculate_image_output_shape(image_size, kernel_size, stride):
+    """
+    ASSUMES SQUARE IMAGES AND NO PADDING ALLOWED.
+    """
+    output_size = (image_size - kernel_size)/stride + 1
+    if int(output_size) != output_size:
+        raise ValueError(
+            'Need (image_size-kernel_size)/stride to be an integer, got: ', output_size)
+    return int(output_size)
