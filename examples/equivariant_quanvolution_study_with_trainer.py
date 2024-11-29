@@ -210,7 +210,7 @@ def main(json_config):
         search_space['n_filters0'] = tune.choice([
             1, 2])
         search_space['n_filters1'] = tune.choice([
-            1, 2, 3])
+            1, 2])
         search_space['n_reuploads'] = tune.choice([1,2,3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
