@@ -4,8 +4,8 @@ NOTE: all circuits assume C4 symmetries which might manifest itself in some hard
 """
 import torch
 from torch import nn
-#TODO: TEMP, REMOVE WHEN STOPPED DEBUGGING
-import matplotlib.pyplot as plt
+# TODO: TEMP, REMOVE WHEN STOPPED DEBUGGING
+# import matplotlib.pyplot as plt
 
 
 class ConvolutionalEQNEC(nn.Module):
@@ -24,7 +24,8 @@ class ConvolutionalEQNEC(nn.Module):
         # NOTE: this shape is hardcoded for kernel size 2 and stride 1 and 2 layers
         dense_input_shape = 4 * \
             (architecture_config['image_size']-2) * \
-            (architecture_config['image_size']-2) * architecture_config['n_filters1']
+            (architecture_config['image_size']-2) * \
+            architecture_config['n_filters1']
         if architecture_config['use_dropout0']:
             self.dropout0 = nn.Dropout(architecture_config['dropout0'])
 
@@ -70,33 +71,33 @@ class ConvolutionalEQEQ(nn.Module):
         self.quantum_classifier = architecture_config['quantum_classifier']
         self.pooling = architecture_config['pooling']
 
-    def forward(self, x, name):
+    def forward(self, x):
         # NOTE: Callum is using batch normalisation here which is not equivariant by default,
         # could use the escnn package to do that if needed
         x = nn.functional.relu(self.quanv0(x))
         x = nn.functional.relu(self.quanv1(x))
         x = x.permute(1, 0, 2, 3, 4)
-        #TODO: TEMP, REMOVE WHEN DONE
-        fig, ax = plt.subplots(4,1)
-        for filter_pose in range(4):
-            ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
-        plt.savefig(name, dpi=300)
-        print(x)
-        #average the group axis
+        # TODO: TEMP, REMOVE WHEN DONE
+        # fig, ax = plt.subplots(4,1)
+        # for filter_pose in range(4):
+        #    ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
+        # plt.savefig(name, dpi=300)
+        # print(x)
+        # average the group axis
         x = x.mean(1)
-        #average the channels
+        # average the channels
         x = x.mean(1)
-        fig1, ax1 = plt.subplots(1)
-        ax1.imshow(x[0].detach().numpy())
-        plt.savefig(name+'_averaged', dpi = 300)
-        print('just before pooling: ', x.shape)
+        # fig1, ax1 = plt.subplots(1)
+        # ax1.imshow(x[0].detach().numpy())
+        # plt.savefig(name+'_averaged', dpi=300)
+        # print('just before pooling: ', x.shape)
         if self.pooling:
-            #this hardcoded for 10x10->3x3 
+            # this hardcoded for 10x10->3x3
             x = nn.AvgPool2d(4, 3)(x)
-        fig1, ax2 = plt.subplots(1)
-        ax2.imshow(x[0].detach().numpy())
-        plt.savefig(name+'_pooled', dpi = 300)
-        #collapse the width and height
+        # fig1, ax2 = plt.subplots(1)
+        # ax2.imshow(x[0].detach().numpy())
+        # plt.savefig(name+'_pooled', dpi=300)
+        # collapse the width and height
         x = x.flatten(1)
         x = self.quantum_classifier(x)
         return x

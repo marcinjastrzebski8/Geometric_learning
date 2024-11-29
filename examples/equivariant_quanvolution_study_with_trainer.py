@@ -93,8 +93,9 @@ def prep_equiv_quanv_model(config, json_config, is_first_layer):
         stride = json_config['stride_quanv0']
 
     else:
-        #NOTE: ATM SIZE OF KERNEL HARDCODED (THROUGHOUT, NOT JUST THIS LINE)
-        input_channel_side_len = calculate_image_output_shape(json_config['image_size'], 2, json_config['stride_quanv0'])
+        # NOTE: ATM SIZE OF KERNEL HARDCODED (THROUGHOUT, NOT JUST THIS LINE)
+        input_channel_side_len = calculate_image_output_shape(
+            json_config['image_size'], 2, json_config['stride_quanv0'])
         quantum_circs = [
             patch_circuit for i in range(config['n_filters1'])]
         quantum_circs_properties = [
@@ -140,8 +141,8 @@ def prep_equiv_quant_classifier(config):
     circuit = BasicClassifierTorch(feature_map='RotEmbedding',
                                    ansatz=GeometricAnsatzConstructor,
                                    size=image_size,
-                                   n_reuploads=n_reuploads, 
-                                   measurement = PauliZ(4))
+                                   n_reuploads=n_reuploads,
+                                   measurement=PauliZ(4))
     circuit_properties = {
         'n_layers': n_layers,
         'embedding_pauli': RX,
@@ -184,7 +185,8 @@ def main(json_config):
         elif architecture_codeword == 'EQEQ':
             architecture_config = {'quanv0': prep_equiv_quanv_model(config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(config, json_config, False),
-                                   'quantum_classifier': prep_equiv_quant_classifier(config)}
+                                   'quantum_classifier': prep_equiv_quant_classifier(config),
+                                   'pooling': True}
             model = ConvolutionalEQEQ(architecture_config)
         else:
             raise ValueError('architecture not supported: ',
@@ -211,7 +213,7 @@ def main(json_config):
             1])
         search_space['n_filters1'] = tune.choice([
             1, 2, 3])
-        search_space['n_reuploads'] = tune.choice([1,2,3])
+        search_space['n_reuploads'] = tune.choice([1, 2, 3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
 
