@@ -16,6 +16,7 @@ import pandas as pd
 import numpy as np
 
 from examples.utils import get_model_names_from_wandb, get_best_config_and_params_from_run
+from examples.equivariant_quanvolution_study_with_trainer import prep_equiv_quant_classifier, prep_equiv_quanv_model
 from data.datasets import dataset_lookup
 from src.torch_architectures import ConvolutionalEQNEC
 from src.geometric_classifier import BasicClassifierTorch
@@ -24,50 +25,6 @@ from src.ansatze import MatchCallumAnsatz
 
 api = wandb.Api()
 
-def prep_equiv_quanv_model(is_first_layer, n_layers, n_reuploads, param_init_max_vals):
-    """
-    Used to reproduce the pennylane TorchLayers used to define the model.
-
-    NOTE: This atm is just copied from the study script... not sure how else I could be saving these TorchLayers
-    Will have to figure out how to generalise.
-    """
-
-    # CHANGE TO CALLUM ANSATZ ONCE HE SENDS DETAILS
-    patch_circuit = BasicClassifierTorch(feature_map='RotEmbedding',
-                                            ansatz=MatchCallumAnsatz,
-                                            size=4,
-                                            n_reuploads=n_reuploads)
-    patch_circuit_properties = {
-        'n_layers': n_layers, 'ansatz_block': [RY, RZ], 'embedding_pauli': RX}
-    # both layers take same size in because we'll use stride=1
-
-    if is_first_layer:
-        input_channel_side_len = 21
-        quantum_circs = [patch_circuit]
-        quantum_circs_properties = [patch_circuit_properties]
-
-    else:
-        # NOTE: this is hardcoded based on filter size and stride - im sure there's a general formula
-        input_channel_side_len = 21 - 1
-        # using the same ansatz for each pose
-        quantum_circs = [patch_circuit for i in range(4)]
-        quantum_circs_properties = [patch_circuit_properties
-                                    for i in range(4)]
-
-    group_info = {'size': 4}
-    # NOTE: parameter shape is kind of hardcoded, could do some lookup table based on ansatz
-    quanv_layer = EquivariantQuanvolution2DTorchLayer(group_info,
-                                                        is_first_layer,
-                                                        quantum_circs,
-                                                        quantum_circs_properties,
-                                                        (input_channel_side_len,
-                                                        input_channel_side_len),
-                                                        1,
-                                                        2,
-                                                        [{'params': (
-                                                            n_reuploads, n_layers, 4, 2)}],
-                                                        param_init_max_vals)
-    return quanv_layer
 
 def validate_ray_models(json_config, n_models_to_keep, test_dataset_name:str):
     """
@@ -96,13 +53,21 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name:str):
         print(f'on model {model_name}')
         best_config, best_params = get_best_config_and_params_from_run(
             model_name, path_to_ray_models, model_name_and_loss[1][1], True)
+        architecture_codeword = json_config['architecture_codeword']
+        if architecture_codeword == 'EQNEC':
+            architecture_config = {**best_config, 
+            'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
+            'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
+            'image_size': 21}
 
-        architecture_config = {**best_config, 
-        'quanv0': prep_equiv_quanv_model(True, best_config['n_layers'], best_config['n_reuploads'], best_config['param_init_max_vals']),
-        'quanv1': prep_equiv_quanv_model(False, best_config['n_layers'], best_config['n_reuploads'], best_config['param_init_max_vals']),
-        'image_size': 21}
+            model = ConvolutionalEQNEC(architecture_config)
+        elif architecture_codeword == 'EQEQ':
+            architecture_config = {**best_config,
+                                'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
+                                'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
+            }
+            model = ConvolutionalEQEQ(architecture_config)
 
-        model = ConvolutionalEQNEC(architecture_config)
         model.load_state_dict(best_params)
         # set to eval mode
         model.eval()
