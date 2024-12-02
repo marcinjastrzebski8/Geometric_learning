@@ -63,9 +63,12 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
             model: ConvolutionalEQEQ | ConvolutionalEQNEC = ConvolutionalEQNEC(
                 architecture_config)
         elif architecture_codeword == 'EQEQ':
+            #best_config probably not needed here
             architecture_config = {**best_config,
                                    'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
+                                   'quantum_classifier': prep_equiv_quant_classifier(best_config),
+                                   'pooling': True
                                    }
             model = ConvolutionalEQEQ(architecture_config)
         else:
