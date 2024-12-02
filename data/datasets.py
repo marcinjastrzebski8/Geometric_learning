@@ -8,20 +8,24 @@ from pathlib import Path
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-from torchvision import datasets
+from torchvision import datasets, transforms
 from torchvision.transforms import functional as F
 from pennylane import numpy as qnp
 from jax import numpy as jnp
 import jax_dataloader as jdl
+import random
 
 path_to_datasets = Path('.').absolute()/'data'
 
+
 class RotateByC4:
-    #from chatgpt
+    # from chatgpt
     def __call__(self, img):
+        img = img.unsqueeze(0)
         angles = [0, 90, 180, 270]
         angle = random.choice(angles)
         return F.rotate(img, angle)
+
 
 def rotate_270(matrix):
     return np.array([list(col) for col in reversed(list(zip(*matrix)))])
@@ -109,8 +113,10 @@ def make_mock_showers(num_data, random_seed, image_length, w_symmetry=False):
                 image.reshape(image_length, image_length)).reshape(image_length*image_length)
     return data
 
-#NOTE: can these three classes be obtained with less code? I need each to be a class but so much of the code repeats!
-#templates??
+# NOTE: can these three classes be obtained with less code? I need each to be a class but so much of the code repeats!
+# templates??
+
+
 class MicrobooneTrainData(Dataset):
 
     def __init__(self):
@@ -172,6 +178,7 @@ class MicrobooneValData(Dataset):
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
 
+
 class MicrobooneTestData(Dataset):
 
     def __init__(self):
@@ -201,6 +208,7 @@ class MicrobooneTestData(Dataset):
         val_idx = np.random.choice(
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
+
 
 class SymmetricDataset(Dataset):
     def __init__(self, size, image_length):
@@ -302,26 +310,28 @@ class SimpleSymmetricDataset(Dataset):
 
 
 class RotatedMNIST(Dataset):
-    
-    def __init__(self,train_bool):
+
+    def __init__(self, train_bool):
         self.transform = transforms.Compose([
-            RotateByC4(),
-            transforms.ToTensor()
+            RotateByC4()
         ])
-        full_dataset = datasets.MNIST(root="./data", train=train_bool, download=False)
+        full_dataset = datasets.MNIST(
+            root="./data", train=train_bool, download=False)
         mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
         self.data = full_dataset.data[mask]
         self.labels = full_dataset.targets[mask]
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.data)
 
     def __getitem__(self, idx):
         img = self.data[idx]
         label = self.labels[idx]
-
+        # Apply the transform
         img = self.transform(img)
-        return sample, label
-#TODO: COMPLETE THIS
-dataset_lookup = {'MicrobooneTestData':MicrobooneTestData,
-                'RotatedMNIST': RotatedMNIST}
+        return img, label
+
+
+# TODO: COMPLETE THIS
+dataset_lookup = {'MicrobooneTestData': MicrobooneTestData,
+                  'RotatedMNIST': RotatedMNIST}
