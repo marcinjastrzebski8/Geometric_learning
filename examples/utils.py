@@ -81,7 +81,7 @@ def get_model_names_from_wandb(api, project_name, metric_name, which_metric_to_c
                     raise ValueError('which_loss_to_choose should be an int or one of (\'min\', \'last\')')
                 model = run.name
                 models_w_metrics[f'{model}'] = [metric, checkpoint_id]
-            except (AttributeError, ValueError) as e:
+            except (AttributeError, ValueError, KeyError) as e:
                 print(e)
 
     print(models_w_metrics)

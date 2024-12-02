@@ -210,7 +210,7 @@ def main(json_config):
         # hyperparams for the quanvolution layer
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
         search_space['n_filters0'] = tune.choice([
-            1])
+            1,2,3])
         search_space['n_filters1'] = tune.choice([
             1, 2, 3])
         search_space['n_reuploads'] = tune.choice([1, 2, 3])
@@ -260,11 +260,6 @@ def main(json_config):
         all_2local_placement_combos = [combo for r in range(
             1, max_gates_per_block+1) for combo in itertools.combinations_with_replacement(gate_placement_2local, r=r)]
 
-        # maybe not the best way to ensure correct gate is used? - this is pretty much fixed by the group, right?
-        # TODO: SEE IF NEEDED AT ALL
-        group_equiv_1local_gate = tune.grid_search([C4On9QEquivGate1Local])
-        group_equiv_2local_gate = tune.grid_search([C4On9QEquivGate2Local])
-
         search_space['1local_gates'] = tune.choice(combos_for_1local_blocks)
         search_space['2local_gates'] = tune.choice(combos_for_2local_blocks)
         search_space['1local_placements'] = tune.choice(
@@ -283,7 +278,7 @@ def main(json_config):
         train_ray, {'cpu': json_config['n_cpus_per_model']})
     run_config = ray_train.RunConfig(storage_path=path_to_package, name=json_config['output_models_dir'], callbacks=[
         WandbLoggerCallback(project=json_config['output_models_dir'])], checkpoint_config=ray_train.CheckpointConfig(
-        checkpoint_score_attribute='loss'))
+        checkpoint_score_attribute='loss'), stop={"training_iteration": json_config['n_epochs']})
     tuner = tune.Tuner(trainable_with_resources, param_space=search_space, tune_config=tune.TuneConfig(
         num_samples=json_config['n_models'], scheduler=scheduler), run_config=run_config)
     tuner.fit()
