@@ -14,6 +14,7 @@ from pennylane import numpy as qnp
 from jax import numpy as jnp
 import jax_dataloader as jdl
 import random
+from PIL import Image
 
 path_to_datasets = Path('.').absolute()/'data'
 
@@ -21,7 +22,6 @@ path_to_datasets = Path('.').absolute()/'data'
 class RotateByC4:
     # from chatgpt
     def __call__(self, img):
-        img = img.unsqueeze(0)
         angles = [0, 90, 180, 270]
         angle = random.choice(angles)
         return F.rotate(img, angle)
@@ -308,18 +308,24 @@ class SimpleSymmetricDataset(Dataset):
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
 
+# NOTE: again, very sloppy way to have train-val-test split from rotated mnist
 
-class RotatedMNIST(Dataset):
 
-    def __init__(self, train_bool):
+class RotatedMNISTTrain(Dataset):
+
+    def __init__(self):
         self.transform = transforms.Compose([
-            RotateByC4()
+            RotateByC4(),
+            transforms.ToTensor()
         ])
         full_dataset = datasets.MNIST(
-            root="./data", train=train_bool, download=False)
+            root=str(path_to_datasets), train=False, download=False)
         mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
-        self.data = full_dataset.data[mask]
-        self.labels = full_dataset.targets[mask]
+        self.data = full_dataset.data[mask][500:600]
+        self.labels = full_dataset.targets[mask][500:600].float()
+        # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
+        self.data = torch.stack(
+            [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
 
     def __len__(self):
         return len(self.data)
@@ -327,11 +333,94 @@ class RotatedMNIST(Dataset):
     def __getitem__(self, idx):
         img = self.data[idx]
         label = self.labels[idx]
-        # Apply the transform
-        img = self.transform(img)
         return img, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
+class RotatedMNISTVal(Dataset):
+
+    def __init__(self):
+        self.transform = transforms.Compose([
+            RotateByC4(),
+            transforms.ToTensor()
+        ])
+        full_dataset = datasets.MNIST(
+            root=str(path_to_datasets), train=False, download=False)
+        mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
+        self.data = full_dataset.data[mask][500:600]
+        self.labels = full_dataset.targets[mask][500:600].float()
+        # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
+        self.data = torch.stack(
+            [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img = self.data[idx]
+        label = self.labels[idx]
+        return img, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
+class RotatedMNISTTest(Dataset):
+
+    def __init__(self):
+        self.transform = transforms.Compose([
+            RotateByC4(),
+            transforms.ToTensor()
+        ])
+        full_dataset = datasets.MNIST(
+            root=str(path_to_datasets), train=False, download=False)
+        mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
+        self.data = full_dataset.data[mask][500:600]
+        self.labels = full_dataset.targets[mask][500:600].float()
+
+        # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
+        self.data = torch.stack(
+            [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img = self.data[idx]
+        label = self.labels[idx]
+        return img, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
 
 
 # TODO: COMPLETE THIS
-dataset_lookup = {'MicrobooneTestData': MicrobooneTestData,
-                  'RotatedMNIST': RotatedMNIST}
+dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
+                  'MicrobooneValData': MicrobooneValData,
+                  'MicrobooneTestData': MicrobooneTestData,
+                  'RotatedMNISTTrainData': RotatedMNISTTrain,
+                  'RotatedMNISTValData': RotatedMNISTVal,
+                  'RotatedMNISTTestData': RotatedMNISTTest}

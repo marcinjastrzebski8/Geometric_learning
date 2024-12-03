@@ -1,5 +1,5 @@
 """
-Ray study of equivariant quanvolution+classical nn classifier on 21x21 microboone slices.
+Ray study of various equivariant classifiers.
 Top be compared with Callum's non-equivariant top performers on the same data.
 
 
@@ -40,7 +40,7 @@ from src.torch_architectures import ConvolutionalEQNEC, ConvolutionalEQEQ
 # NOTE atm im restricted to working with 9-qubit representations of C4 which restrics architecture design
 from src.twirling import c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
 from pqc_training.trainer import NewTrainer
-from data.datasets import MicrobooneTrainData, MicrobooneValData
+from data.datasets import dataset_lookup
 from .utils import calculate_image_output_shape
 
 api = wandb.Api()
@@ -62,7 +62,7 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_da
                   dataset,
                   optimizer,
                   criterion,
-                  500,
+                  10,
                   0,
                   batch_size,
                   val_dataset,
@@ -164,6 +164,9 @@ def prep_equiv_quant_classifier(config):
 def main(json_config):
     print('json config', json_config)
     architecture_codeword = json_config['architecture_codeword']
+    dataset_name = json_config['dataset_name']
+    train_dataset = dataset_name+'TrainData'
+    val_dataset = dataset_name+'ValData'
 
     def train_ray(config):
         """
@@ -195,8 +198,8 @@ def main(json_config):
         optimiser = optim.Adam(
             model.parameters(), lr=config['lr'])
 
-        train_model(model, MicrobooneTrainData(), criterion,
-                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=MicrobooneValData()[:])
+        train_model(model, dataset_lookup[train_dataset](), criterion,
+                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=dataset_lookup[val_dataset]()[:10])
 
     # search space params
     # NOTE: NOT YET HOW TO HANDLE MULTIPLE POSSIBLE ARCHITECTURES ATM, PROBABLY SOME LOOKUP DICT
@@ -210,7 +213,7 @@ def main(json_config):
         # hyperparams for the quanvolution layer
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
         search_space['n_filters0'] = tune.choice([
-            1,2,3])
+            1, 2, 3])
         search_space['n_filters1'] = tune.choice([
             1, 2, 3])
         search_space['n_reuploads'] = tune.choice([1, 2, 3])
