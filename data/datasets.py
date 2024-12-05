@@ -311,7 +311,12 @@ class SimpleSymmetricDataset(Dataset):
 # NOTE: again, very sloppy way to have train-val-test split from rotated mnist
 
 
-class RotatedMNISTTrain(Dataset):
+class legacy_RotatedMNISTTrain(Dataset):
+    """
+    Keeping this just in case. This is how the rotmnist dataset has been created. 
+    Slices for val were 500:600 and test 600:
+    These have been saved and are now read by RotatedMNIST...() classes.
+    """
 
     def __init__(self):
         self.transform = transforms.Compose([
@@ -346,29 +351,52 @@ class RotatedMNISTTrain(Dataset):
         return train_idx, val_idx
 
 
+class RotatedMNISTTrain(Dataset):
+
+    def __init__(self):
+        self.data = torch.load(
+            path_to_datasets/'rot_MNIST/train_data.pt')
+        self.labels = torch.load(
+            path_to_datasets/'rot_MNIST/train_labels.pt')
+        self.shape = self.data.shape
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        label = self.labels[idx]
+
+        return sample, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
 class RotatedMNISTVal(Dataset):
 
     def __init__(self):
-        self.transform = transforms.Compose([
-            RotateByC4(),
-            transforms.ToTensor()
-        ])
-        full_dataset = datasets.MNIST(
-            root=str(path_to_datasets), train=False, download=False)
-        mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
-        self.data = full_dataset.data[mask][500:600]
-        self.labels = full_dataset.targets[mask][500:600].float()
-        # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
-        self.data = torch.stack(
-            [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
+        self.data = torch.load(
+            path_to_datasets/'rot_MNIST/val_data.pt')
+        self.labels = torch.load(
+            path_to_datasets/'rot_MNIST/val_labels.pt')
+        self.shape = self.data.shape
 
     def __len__(self):
-        return len(self.data)
+        return self.data.shape[0]
 
     def __getitem__(self, idx):
-        img = self.data[idx]
+        sample = self.data[idx]
         label = self.labels[idx]
-        return img, label
+
+        return sample, label
 
     def split(self, train_size, validation_size):
         dataset_size = self.data.shape[0]
@@ -384,27 +412,20 @@ class RotatedMNISTVal(Dataset):
 class RotatedMNISTTest(Dataset):
 
     def __init__(self):
-        self.transform = transforms.Compose([
-            RotateByC4(),
-            transforms.ToTensor()
-        ])
-        full_dataset = datasets.MNIST(
-            root=str(path_to_datasets), train=False, download=False)
-        mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
-        self.data = full_dataset.data[mask][600:]
-        self.labels = full_dataset.targets[mask][600:].float()
-
-        # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
-        self.data = torch.stack(
-            [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
+        self.data = torch.load(
+            path_to_datasets/'rot_MNIST/test_data.pt')
+        self.labels = torch.load(
+            path_to_datasets/'rot_MNIST/test_labels.pt')
+        self.shape = self.data.shape
 
     def __len__(self):
-        return len(self.data)
+        return self.data.shape[0]
 
     def __getitem__(self, idx):
-        img = self.data[idx]
+        sample = self.data[idx]
         label = self.labels[idx]
-        return img, label
+
+        return sample, label
 
     def split(self, train_size, validation_size):
         dataset_size = self.data.shape[0]
@@ -421,6 +442,6 @@ class RotatedMNISTTest(Dataset):
 dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
                   'MicrobooneValData': MicrobooneValData,
                   'MicrobooneTestData': MicrobooneTestData,
-                  'RotatedMNISTTrainData': RotatedMNISTTrain,
-                  'RotatedMNISTValData': RotatedMNISTVal,
-                  'RotatedMNISTTestData': RotatedMNISTTest}
+                  'RotatedMNISTTrainData': MicrobooneTrainData,
+                  'RotatedMNISTValData': MicrobooneValData,
+                  'RotatedMNISTTestData': MicrobooneTestData}
