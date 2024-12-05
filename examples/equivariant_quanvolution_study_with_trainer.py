@@ -62,7 +62,7 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_da
                   dataset,
                   optimizer,
                   criterion,
-                  10,
+                  500,
                   0,
                   batch_size,
                   val_dataset,
@@ -199,7 +199,7 @@ def main(json_config):
             model.parameters(), lr=config['lr'])
 
         train_model(model, dataset_lookup[train_dataset](), criterion,
-                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=dataset_lookup[val_dataset]()[:10])
+                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=dataset_lookup[val_dataset]()[:])
 
     # search space params
     # NOTE: NOT YET HOW TO HANDLE MULTIPLE POSSIBLE ARCHITECTURES ATM, PROBABLY SOME LOOKUP DICT
@@ -213,9 +213,9 @@ def main(json_config):
         # hyperparams for the quanvolution layer
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
         search_space['n_filters0'] = tune.choice([
-            1, 2, 3])
+            1, 2])
         search_space['n_filters1'] = tune.choice([
-            1, 2, 3])
+            1, 2])
         search_space['n_reuploads'] = tune.choice([1, 2, 3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])

@@ -321,8 +321,8 @@ class RotatedMNISTTrain(Dataset):
         full_dataset = datasets.MNIST(
             root=str(path_to_datasets), train=False, download=False)
         mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
-        self.data = full_dataset.data[mask][500:600]
-        self.labels = full_dataset.targets[mask][500:600].float()
+        self.data = full_dataset.data[mask][:500]
+        self.labels = full_dataset.targets[mask][:500].float()
         # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
         self.data = torch.stack(
             [self.transform(Image.fromarray(img.numpy(), mode='L')) for img in self.data])
@@ -391,8 +391,8 @@ class RotatedMNISTTest(Dataset):
         full_dataset = datasets.MNIST(
             root=str(path_to_datasets), train=False, download=False)
         mask = (full_dataset.targets == 0) | (full_dataset.targets == 1)
-        self.data = full_dataset.data[mask][500:600]
-        self.labels = full_dataset.targets[mask][500:600].float()
+        self.data = full_dataset.data[mask][600:]
+        self.labels = full_dataset.targets[mask][600:].float()
 
         # From gpt, not sure wht the transform has to go here but it returns bytes when applied at load time
         self.data = torch.stack(
