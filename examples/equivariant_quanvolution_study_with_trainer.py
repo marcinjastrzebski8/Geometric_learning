@@ -213,9 +213,9 @@ def main(json_config):
         # hyperparams for the quanvolution layer
         search_space['n_layers'] = tune.choice([1, 2, 3, 4])
         search_space['n_filters0'] = tune.choice([
-            1, 2])
+            1, 2, 3])
         search_space['n_filters1'] = tune.choice([
-            1, 2])
+            1, 2, 3])
         search_space['n_reuploads'] = tune.choice([1, 2, 3])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
@@ -273,7 +273,7 @@ def main(json_config):
         search_space['classifier_n_reuploads'] = tune.choice([1])
 
     scheduler = ASHAScheduler(
-        time_attr='training_iteration', grace_period=5, metric='loss', mode='min')
+        time_attr='training_iteration', grace_period=5, metric=json_config['scheduler_metric'], mode=json_config['scheduler_mode'])
 
     # set up ray with weights and biases logging
     ray.init(num_cpus=json_config['n_cpus'])

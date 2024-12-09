@@ -442,6 +442,6 @@ class RotatedMNISTTest(Dataset):
 dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
                   'MicrobooneValData': MicrobooneValData,
                   'MicrobooneTestData': MicrobooneTestData,
-                  'RotatedMNISTTrainData': MicrobooneTrainData,
-                  'RotatedMNISTValData': MicrobooneValData,
-                  'RotatedMNISTTestData': MicrobooneTestData}
+                  'RotatedMNISTTrainData': RotatedMNISTTrain,
+                  'RotatedMNISTValData': RotatedMNISTVal,
+                  'RotatedMNISTTestData': RotatedMNISTTest}
