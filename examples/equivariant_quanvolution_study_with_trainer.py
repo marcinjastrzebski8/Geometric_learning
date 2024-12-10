@@ -41,7 +41,7 @@ from src.torch_architectures import ConvolutionalEQNEC, ConvolutionalEQEQ
 from src.twirling import c4_rep_on_qubits, C4On9QEquivGate1Local, C4On9QEquivGate2Local
 from pqc_training.trainer import NewTrainer
 from data.datasets import dataset_lookup
-from .utils import calculate_image_output_shape
+from .utils import calculate_image_output_shape  # pylint:disable=relative-beyond-top-level
 
 api = wandb.Api()
 path_to_package = Path('.').absolute()
@@ -165,8 +165,8 @@ def main(json_config):
     print('json config', json_config)
     architecture_codeword = json_config['architecture_codeword']
     dataset_name = json_config['dataset_name']
-    train_dataset = dataset_name+'TrainData'
-    val_dataset = dataset_name+'ValData'
+    train_dataset_name = dataset_name+'TrainData'
+    val_dataset_name = dataset_name+'ValData'
 
     def train_ray(config):
         """
@@ -197,9 +197,16 @@ def main(json_config):
 
         optimiser = optim.Adam(
             model.parameters(), lr=config['lr'])
-
-        train_model(model, dataset_lookup[train_dataset](), criterion,
-                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=dataset_lookup[val_dataset]()[:])
+        if dataset_name != "Microboone":
+            train_dataset = dataset_lookup[train_dataset_name]()
+            val_dataset = dataset_lookup[val_dataset_name]()[:]
+        else:
+            train_dataset = dataset_lookup[train_dataset_name](
+                json_config['image_size'])
+            val_dataset = dataset_lookup[val_dataset_name](
+                json_config['image_size'])[:]
+        train_model(model, train_dataset, criterion,
+                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=val_dataset)
 
     # search space params
     # NOTE: NOT YET HOW TO HANDLE MULTIPLE POSSIBLE ARCHITECTURES ATM, PROBABLY SOME LOOKUP DICT
@@ -211,12 +218,13 @@ def main(json_config):
 
     if architecture_codeword[:2] == 'EQ':
         # hyperparams for the quanvolution layer
-        search_space['n_layers'] = tune.choice([1, 2, 3, 4])
-        search_space['n_filters0'] = tune.choice([
-            1, 2, 3])
-        search_space['n_filters1'] = tune.choice([
-            1, 2, 3])
-        search_space['n_reuploads'] = tune.choice([1, 2, 3])
+        search_space['n_layers'] = tune.choice(json_config['eqxx_n_layers'])
+        search_space['n_filters0'] = tune.choice(
+            json_config['eqxx_n_filters0'])
+        search_space['n_filters1'] = tune.choice(
+            json_config['eqxx_n_filters1'])
+        search_space['n_reuploads'] = tune.choice(
+            json_config['eqxx_n_reuploads'])
         search_space['param_init_max_vals'] = tune.choice(
             [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
 
@@ -227,14 +235,17 @@ def main(json_config):
         raise ValueError(
             'architecture codeword in the json_config is not supported: ', architecture_codeword)
     if architecture_codeword[2:] == 'NEC':
-        # hyperparams for the classical classification network
-        search_space['dense_units'] = tune.choice([[128, 32], [8, 8]])
-        search_space['use_dropout0'] = search_space['use_dropout1'] = tune.choice([
-            True, False])
+        # hyperparams for the classical classification network - atm only shallow ffnn (2 layers) used
+        search_space['dense_units'] = tune.choice(
+            json_config['xxnec_dense_units'])
+        # dropout search space hardcoded - change if needed
+        search_space['use_dropout0'] = search_space['use_dropout1'] = tune.choice(
+            [True, False])
         search_space['dropout0'] = search_space['dropout1'] = tune.uniform(
             1e-4, 0.5)
     elif architecture_codeword[2:] == 'EQ':
         # hyperparams for quantum classification network
+        # these used in defining equivariant gates which make up the ansatze
         gate_placement_1local = ['corner', 'side', 'centre']
         gate_placement_2local = [
             'side_centre',
@@ -269,8 +280,11 @@ def main(json_config):
             all_1local_placement_combos)
         search_space['2local_placements'] = tune.choice(
             all_2local_placement_combos)
-        search_space['classifier_n_layers'] = tune.choice([1, 2, 3, 4])
-        search_space['classifier_n_reuploads'] = tune.choice([1])
+        # above hardcoded, these should be specified in json_config
+        search_space['classifier_n_layers'] = tune.choice(
+            json_config['xxeq_n_layers'])
+        search_space['classifier_n_reuploads'] = tune.choice(
+            json_config['xxeq_n_reuploads'])
 
     scheduler = ASHAScheduler(
         time_attr='training_iteration', grace_period=5, metric=json_config['scheduler_metric'], mode=json_config['scheduler_mode'])

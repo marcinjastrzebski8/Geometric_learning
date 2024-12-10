@@ -119,13 +119,13 @@ def make_mock_showers(num_data, random_seed, image_length, w_symmetry=False):
 
 class MicrobooneTrainData(Dataset):
 
-    def __init__(self):
+    def __init__(self, size: int):
         data = torch.load(
-            path_to_datasets/'microboone_from_callum/train_data.pt')
+            path_to_datasets/f'microboone_from_callum/train_data_{size}x{size}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         self.labels = torch.load(
-            path_to_datasets/'microboone_from_callum/train_labels.pt')
+            path_to_datasets/f'microboone_from_callum/train_labels_{size}x{size}.pt')
         self.shape = self.data.shape
 
     def __len__(self):
@@ -150,13 +150,13 @@ class MicrobooneTrainData(Dataset):
 
 class MicrobooneValData(Dataset):
 
-    def __init__(self):
+    def __init__(self, size: int):
         data = torch.load(
-            path_to_datasets/'microboone_from_callum/val_data.pt')
+            path_to_datasets/f'microboone_from_callum/val_data_{size}x{size}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         self.labels = torch.load(
-            path_to_datasets/'microboone_from_callum/val_labels.pt')
+            path_to_datasets/f'microboone_from_callum/val_labels_{size}x{size}.pt')
         self.shape = self.data.shape
 
     def __len__(self):
@@ -181,13 +181,13 @@ class MicrobooneValData(Dataset):
 
 class MicrobooneTestData(Dataset):
 
-    def __init__(self):
+    def __init__(self, size: int):
         data = torch.load(
-            path_to_datasets/'microboone_from_callum/test_data.pt')
+            path_to_datasets/f'microboone_from_callum/test_data.pt_{size}x{size}')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         self.labels = torch.load(
-            path_to_datasets/'microboone_from_callum/test_labels.pt')
+            path_to_datasets/f'microboone_from_callum/test_labels.pt_{size}x{size}')
         self.shape = self.data.shape
 
     def __len__(self):
