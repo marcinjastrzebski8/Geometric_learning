@@ -26,7 +26,7 @@ from src.ansatze import MatchCallumAnsatz
 api = wandb.Api()
 
 
-def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
+def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str, dataset_kwargs: None | dict = None):
     """
     Given a ray run and some metadata, check performance of the best found models on some test data.
     """
@@ -43,7 +43,10 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
     x_axes = []
     y_axes = []
 
-    test_dataset = dataset_lookup[test_dataset_name]()
+    if dataset_kwargs is None:
+        dataset_kwargs = {}
+
+    test_dataset = dataset_lookup[test_dataset_name](**dataset_kwargs)
     test_dataset = torch.utils.data.Subset(test_dataset, range(10000))
     test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
@@ -52,7 +55,7 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
             0], model_name_and_loss[1][0], model_name_and_loss[1][1]
         print(f'on model {model_name}')
         best_config, best_params = get_best_config_and_params_from_run(
-            model_name, path_to_ray_models, model_name_and_loss[1][1], True)
+            model_name, path_to_ray_models, loss_checkpoint_id, True)
         architecture_codeword = json_config['architecture_codeword']
         if architecture_codeword == 'EQNEC':
             architecture_config = {**best_config,
@@ -63,7 +66,7 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
             model: ConvolutionalEQEQ | ConvolutionalEQNEC = ConvolutionalEQNEC(
                 architecture_config)
         elif architecture_codeword == 'EQEQ':
-            #best_config probably not needed here
+            # best_config probably not needed here
             architecture_config = {**best_config,
                                    'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
@@ -84,19 +87,20 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
             outputs = model(test_batch).view(-1)
             outputs_gathered.append(outputs.detach().numpy())
             labels_gathered.append(test_labels.detach().numpy())
-        outputs_gathered = np.array(outputs_gathered).flatten()
-        labels_gathered = np.array(labels_gathered).flatten()
+        outputs_gathered_arr = np.array(outputs_gathered).flatten()
+        labels_gathered_arr = np.array(labels_gathered).flatten()
 
-        fpr, tpr, thresholds = roc_curve(labels_gathered, outputs_gathered)
+        fpr, tpr, thresholds = roc_curve(
+            labels_gathered_arr, outputs_gathered_arr)
         x_axes.append(fpr)
         y_axes.append(tpr)
         # find acc with best threshold assuming same weight for fpr and tpr
         threshold_id = np.argmax(tpr-fpr)
         threshold = thresholds[threshold_id]
         labels_predicted = [0 if output <
-                            threshold else 1 for output in outputs_gathered]
-        acc = accuracy_score(labels_gathered, labels_predicted)
-        auc = roc_auc_score(labels_gathered, outputs_gathered)
+                            threshold else 1 for output in outputs_gathered_arr]
+        acc = accuracy_score(labels_gathered_arr, labels_predicted)
+        auc = roc_auc_score(labels_gathered_arr, outputs_gathered_arr)
         aucs.append(auc)
         accs.append(acc)
 
@@ -124,11 +128,17 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('run_config_path')
-    parser.add_argument('n_models_to_keep')
+    parser.add_argument('n_models_to_keep', type=int)
     parser.add_argument('test_dataset_name')
+    parser.add_argument("--microboone_patch_size", type=int)
     parse_args = parser.parse_args()
     # load config
     with open(parse_args.run_config_path, 'r', encoding='utf-8') as f:
         load_config = json.load(f)
+    if parse_args.test_dataset_name == 'Microboone':
+        dataset_kwargs: dict | None = {
+            'patch_size': parse_args.microboone_patch_size}
+    else:
+        dataset_kwargs = None
     validate_ray_models(load_config, parse_args.n_models_to_keep,
-                        parse_args.test_dataset_name)
+                        parse_args.test_dataset_name, dataset_kwargs)
