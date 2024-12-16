@@ -26,7 +26,11 @@ from src.ansatze import MatchCallumAnsatz
 api = wandb.Api()
 
 
-def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str, dataset_kwargs: None | dict = None):
+def validate_ray_models(json_config, 
+    n_models_to_keep, 
+    test_dataset_name: str,
+    test_data_size:int, 
+    dataset_kwargs: None | dict = None):
     """
     Given a ray run and some metadata, check performance of the best found models on some test data.
     """
@@ -46,9 +50,9 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str, d
     if dataset_kwargs is None:
         dataset_kwargs = {}
 
-    test_dataset = dataset_lookup[test_dataset_name](**dataset_kwargs)
-    test_dataset = torch.utils.data.Subset(test_dataset, range(10000))
-    test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
+    test_dataset = dataset_lookup[test_dataset_name+'TestData'](**dataset_kwargs)
+    test_dataset = torch.utils.data.Subset(test_dataset, range(test_data_size))
+    test_loader = DataLoader(test_dataset, batch_size=5, shuffle=False)
 
     for model_name_and_loss in best_models:
         model_name, model_loss, loss_checkpoint_id = model_name_and_loss[
@@ -61,7 +65,7 @@ def validate_ray_models(json_config, n_models_to_keep, test_dataset_name: str, d
             architecture_config = {**best_config,
                                    'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
-                                   'image_size': 21}
+                                   'image_size': json_config['image_size']}
 
             model: ConvolutionalEQEQ | ConvolutionalEQNEC = ConvolutionalEQNEC(
                 architecture_config)
@@ -130,6 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('run_config_path')
     parser.add_argument('n_models_to_keep', type=int)
     parser.add_argument('test_dataset_name')
+    parser.add_argument('test_data_size', type=int)
     parser.add_argument("--microboone_patch_size", type=int)
     parse_args = parser.parse_args()
     # load config
@@ -141,4 +146,4 @@ if __name__ == '__main__':
     else:
         dataset_kwargs = None
     validate_ray_models(load_config, parse_args.n_models_to_keep,
-                        parse_args.test_dataset_name, dataset_kwargs)
+                        parse_args.test_dataset_name, parse_args.test_data_size, dataset_kwargs)
