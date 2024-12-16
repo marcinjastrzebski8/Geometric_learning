@@ -124,8 +124,9 @@ class MicrobooneTrainData(Dataset):
             path_to_datasets/f'microboone_from_callum/train_data_{size}x{size}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
-        self.labels = torch.load(
+        labels = torch.load(
             path_to_datasets/f'microboone_from_callum/train_labels_{size}x{size}.pt')
+        self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
     def __len__(self):
@@ -155,8 +156,9 @@ class MicrobooneValData(Dataset):
             path_to_datasets/f'microboone_from_callum/val_data_{size}x{size}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
-        self.labels = torch.load(
+        labels = torch.load(
             path_to_datasets/f'microboone_from_callum/val_labels_{size}x{size}.pt')
+        self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
     def __len__(self):
@@ -186,8 +188,9 @@ class MicrobooneTestData(Dataset):
             path_to_datasets/f'microboone_from_callum/test_data.pt_{size}x{size}')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
-        self.labels = torch.load(
+        labels = torch.load(
             path_to_datasets/f'microboone_from_callum/test_labels.pt_{size}x{size}')
+        self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
     def __len__(self):
