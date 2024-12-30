@@ -185,11 +185,11 @@ class MicrobooneTestData(Dataset):
 
     def __init__(self, size: int):
         data = torch.load(
-            path_to_datasets/f'microboone_from_callum/test_data.pt_{size}x{size}')
+            path_to_datasets/f'microboone_from_callum/test_data_{size}x{size}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         labels = torch.load(
-            path_to_datasets/f'microboone_from_callum/test_labels.pt_{size}x{size}')
+            path_to_datasets/f'microboone_from_callum/test_labels_{size}x{size}.pt')
         self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
@@ -441,7 +441,7 @@ class RotatedMNISTTest(Dataset):
         return train_idx, val_idx
 
 
-# TODO: COMPLETE THIS
+
 dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
                   'MicrobooneValData': MicrobooneValData,
                   'MicrobooneTestData': MicrobooneTestData,

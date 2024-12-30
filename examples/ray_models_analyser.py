@@ -142,7 +142,7 @@ if __name__ == '__main__':
         load_config = json.load(f)
     if parse_args.test_dataset_name == 'Microboone':
         dataset_kwargs: dict | None = {
-            'patch_size': parse_args.microboone_patch_size}
+            'size': parse_args.microboone_patch_size}
     else:
         dataset_kwargs = None
     validate_ray_models(load_config, parse_args.n_models_to_keep,
