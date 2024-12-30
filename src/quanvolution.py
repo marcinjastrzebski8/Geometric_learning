@@ -185,7 +185,8 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                  stride,
                  kernel_size,
                  weight_shapes_list: Sequence[dict],
-                 weights_init_max_val: float = 2 * math.pi):
+                 weights_init_max_val: float = 2 * math.pi,
+                 verbose=False):
         super().__init__()
         # for now this is just a dictionary with very minimal information - group size
         self.group = group
@@ -221,12 +222,14 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
                 [quantum_circ.prediction_circuit(quantum_circ_properties) for i in range(self.group['size'])] for quantum_circ, quantum_circ_properties in zip(quantum_circs, quantum_circs_properties)]
             self.torch_layers = [[qml.qnn.TorchLayer(
                 quantum_filter[i], weight_shapes, init_method=init_method) for i in range(self.group['size'])] for quantum_filter, weight_shapes in zip(quantum_filters, weight_shapes_list)]
-        print('GOT TORCH LAYERS (FILTERS) ', len(self.torch_layers))
-        print(self.torch_layers)
-        print('quantum_circs', len(quantum_circs))
-        print('quantum_filters', len(quantum_filters))
-        print('properties', len(quantum_circs_properties))
-        print('weight_shapes', len(weight_shapes_list))
+        self.verbose = verbose
+        if self.verbose:
+            print('GOT TORCH LAYERS (FILTERS) ', len(self.torch_layers))
+            print(self.torch_layers)
+            print('quantum_circs', len(quantum_circs))
+            print('quantum_filters', len(quantum_filters))
+            print('properties', len(quantum_circs_properties))
+            print('weight_shapes', len(weight_shapes_list))
         self.bias = nn.Parameter(torch.ones(len(self.torch_layers))*0.1)
 
     def quantum_convolution(self, input_channel, torch_layer):
@@ -251,8 +254,9 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
             # NOTE: assumes square kernel
             rotated_patches_to_convolve = create_structured_patches(
                 patches_to_convolve, self.kernel_sizes[0]).view(-1, np.prod(self.kernel_sizes))
-            print('SHAPE OF ROTATED PATCHES IS: ',
-                  rotated_patches_to_convolve.shape)
+            if self.verbose:
+                print('SHAPE OF ROTATED PATCHES IS: ',
+                      rotated_patches_to_convolve.shape)
 
             output = torch_layer(
                 rotated_patches_to_convolve).view(self.group['size'], -1, self.h_iter*self.w_iter)
@@ -260,7 +264,8 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
         else:
             # data has shape (|G|, batch_size, prod(kernel_sizes), h_iter*w_iter)
             batch_size = input_channel.shape[1]
-            print('batch_size: ', batch_size)
+            if self.verbose:
+                print('batch_size: ', batch_size)
             patches_to_convolve = input_channel.permute(
                 0, 1, 3, 2).reshape(self.group['size'], -1, np.prod(self.kernel_sizes))
             # NOTE: assumes square kernel
@@ -291,7 +296,8 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
             batch_size, n_input_channels = input_channels.shape[:2]
         else:
             batch_size, n_input_channels = input_channels.shape[1:3]
-        print('INPUT CHANNELS SHAPE ', input_channels.shape)
+        if self.verbose:
+            print('INPUT CHANNELS SHAPE ', input_channels.shape)
 
         if not self.is_first_layer_quanv:
             # temporarily permute and flatten the group dimension along the input_channel dimension to allow unfolding
@@ -301,7 +307,8 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
         # this extracts (batch_size, n_input_channels*prod(kernel_sizes), h_iter*w_iter)
         input_channels_unfolded = torch.nn.functional.unfold(
             input_channels, kernel_size=self.kernel_sizes, stride=self.strides)
-        print('UNFOLDED: ', input_channels_unfolded.shape)
+        if self.verbose:
+            print('UNFOLDED: ', input_channels_unfolded.shape)
 
         # this separates the input channels
         if self.is_first_layer_quanv:
@@ -327,14 +334,16 @@ class EquivariantQuanvolution2DTorchLayer(nn.Module):
 
             filter_output = torch.zeros(
                 self.group['size'], batch_size, self.h_iter*self.w_iter)
-            print('FILTER OUTPUT SHAPE:', filter_output.shape)
+            if self.verbose:
+                print('FILTER OUTPUT SHAPE:', filter_output.shape)
             # Input channel iteration
             for input_channel_id in range(n_input_channels):
 
                 if self.is_first_layer_quanv:
                     channel_output = self.quantum_convolution(input_channels_unfolded[:, input_channel_id, :, :,],
                                                               torch_layer)
-                    print('CHANNEL OUTPUT SHAPE:', channel_output.shape)
+                    if self.verbose:
+                        print('CHANNEL OUTPUT SHAPE:', channel_output.shape)
                 else:
                     channel_output = self.quantum_convolution(input_channels_unfolded[:, :, input_channel_id, :, :,],
                                                               torch_layer)
