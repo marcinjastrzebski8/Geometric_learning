@@ -187,7 +187,8 @@ def main(json_config):
             architecture_config = {'quanv0': prep_equiv_quanv_model(config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(config, json_config, False),
                                    'quantum_classifier': prep_equiv_quant_classifier(config),
-                                   'pooling': True}
+                                   'pooling_kernels_size': json_config['pooling_kernels_size'],
+                                   'pooling_strides': json_config['pooling_strides']}
             model = ConvolutionalEQEQ(architecture_config)
         else:
             raise ValueError('architecture not supported: ',
