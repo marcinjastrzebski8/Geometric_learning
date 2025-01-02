@@ -47,7 +47,7 @@ api = wandb.Api()
 path_to_package = Path('.').absolute()
 
 
-def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_dataset=None):
+def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_dataset=None, train_size=500):
     """
     This changed from first study script to utilise the new trainer class.
     """
@@ -62,7 +62,7 @@ def train_model(model, dataset, criterion, optimizer, epochs, batch_size, val_da
                   dataset,
                   optimizer,
                   criterion,
-                  500,
+                  train_size,
                   0,
                   batch_size,
                   val_dataset,
@@ -201,11 +201,17 @@ def main(json_config):
             val_dataset = dataset_lookup[val_dataset_name]()[:]
         else:
             train_dataset = dataset_lookup[train_dataset_name](
-                json_config['image_size'])
+                json_config['image_size'], json_config['train_size'])
             val_dataset = dataset_lookup[val_dataset_name](
                 json_config['image_size'])[:]
-        train_model(model, train_dataset, criterion,
-                    optimiser, json_config['n_epochs'], json_config['batch_size'], val_dataset=val_dataset)
+        train_model(model,
+                    train_dataset,
+                    criterion,
+                    optimiser,
+                    json_config['n_epochs'],
+                    json_config['batch_size'],
+                    val_dataset=val_dataset,
+                    train_size=json_config['train_size'])
 
     # search space params
     # NOTE: NOT YET HOW TO HANDLE MULTIPLE POSSIBLE ARCHITECTURES ATM, PROBABLY SOME LOOKUP DICT

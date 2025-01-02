@@ -118,14 +118,26 @@ def make_mock_showers(num_data, random_seed, image_length, w_symmetry=False):
 
 
 class MicrobooneTrainData(Dataset):
+    """
+    Nomenclature for this dataset is: {type}_data_{patch_size}x{patch_size} if dataset size is 500
+    otherwise {type}_data_{dataset_size} and patch size = 21 needs to be used.
 
-    def __init__(self, size: int):
+    Not the cleanest but hey here we are.
+    """
+
+    def __init__(self, patch_size: int, dataset_size: int = 500):
+
+        if dataset_size != 500:
+            dataname_suffix = str(dataset_size)
+            assert patch_size == 21
+        else:
+            dataname_suffix = f'{patch_size}x{patch_size}'
         data = torch.load(
-            path_to_datasets/f'microboone_from_callum/train_data_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/train_data_{dataname_suffix}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         labels = torch.load(
-            path_to_datasets/f'microboone_from_callum/train_labels_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/train_labels_{patch_size}x{patch_size}.pt')
         self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
@@ -150,14 +162,25 @@ class MicrobooneTrainData(Dataset):
 
 
 class MicrobooneValData(Dataset):
+    """
+    Nomenclature for this dataset is: {type}_data_{patch_size}x{patch_size} if dataset size is 500
+    otherwise {type}_data_{dataset_size} and patch size = 21 needs to be used.
 
-    def __init__(self, size: int):
+    Not the cleanest but hey here we are.
+    """
+
+    def __init__(self, patch_size: int, dataset_size: int = 500):
+        if dataset_size != 500:
+            dataname_suffix = str(dataset_size)
+            assert patch_size == 21
+        else:
+            dataname_suffix = f'{patch_size}x{patch_size}'
         data = torch.load(
-            path_to_datasets/f'microboone_from_callum/val_data_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/val_data_{dataname_suffix}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         labels = torch.load(
-            path_to_datasets/f'microboone_from_callum/val_labels_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/val_labels_{dataname_suffix}.pt')
         self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
@@ -182,14 +205,25 @@ class MicrobooneValData(Dataset):
 
 
 class MicrobooneTestData(Dataset):
+    """
+    Nomenclature for this dataset is: {type}_data_{patch_size}x{patch_size} if dataset size is 500
+    otherwise {type}_data_{dataset_size} and patch size = 21 needs to be used.
 
-    def __init__(self, size: int):
+    Not the cleanest but hey here we are.
+    """
+
+    def __init__(self, patch_size: int, dataset_size: int = 500):
+        if dataset_size != 500:
+            dataname_suffix = str(dataset_size)
+            assert patch_size == 21
+        else:
+            dataname_suffix = f'{patch_size}x{patch_size}'
         data = torch.load(
-            path_to_datasets/f'microboone_from_callum/test_data_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/test_data_{dataname_suffix}.pt')
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         labels = torch.load(
-            path_to_datasets/f'microboone_from_callum/test_labels_{size}x{size}.pt')
+            path_to_datasets/f'microboone_from_callum/test_labels_{dataname_suffix}.pt')
         self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 
@@ -439,7 +473,6 @@ class RotatedMNISTTest(Dataset):
         val_idx = np.random.choice(
             remaining_idxs, size=validation_size, replace=False)
         return train_idx, val_idx
-
 
 
 dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
