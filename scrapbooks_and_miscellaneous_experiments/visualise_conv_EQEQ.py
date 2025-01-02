@@ -9,8 +9,8 @@ from data.datasets import MicrobooneTrainData
 
 
 fake_json_config = {'image_size': 21,
-                'stride_quanv0': 1,
-                'stride_quanv1': 2}
+                    'stride_quanv0': 1,
+                    'stride_quanv1': 2}
 fake_config = {'n_layers': 1,
                'n_reuploads': 1,
                'n_filters0': 1,
@@ -27,15 +27,16 @@ fake_config = {'n_layers': 1,
 architecture_config = {'quanv0': prep_equiv_quanv_model(fake_config, fake_json_config, True),
                        'quanv1': prep_equiv_quanv_model(fake_config, fake_json_config, False),
                        'quantum_classifier': prep_equiv_quant_classifier(fake_config),
-                       'pooling': True}
+                       'pooling_kernels_size': [2, 3],
+                       'pooling_strides': [2, 2]}
 
 model = ConvolutionalEQEQ(architecture_config)
 
-datapoint = MicrobooneTrainData()[0][0]
-datapoint1 = datapoint.rot90(1,(1,2))
+datapoint = MicrobooneTrainData(21)[0][0]
+datapoint1 = datapoint.rot90(1, (1, 2))
 idx = torch.randperm(datapoint.nelement())
 datapoint2 = datapoint.view(-1)[idx].view(datapoint.size())
-#datapoint = torch.rand((1, 5, 5))
+# datapoint = torch.rand((1, 5, 5))
 fig, ax = plt.subplots(3, 1)
 ax[0].imshow(datapoint[0])
 ax[1].imshow(datapoint1[0])

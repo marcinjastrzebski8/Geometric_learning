@@ -5,7 +5,7 @@ NOTE: all circuits assume C4 symmetries which might manifest itself in some hard
 import torch
 from torch import nn
 # TODO: TEMP, REMOVE WHEN STOPPED DEBUGGING
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 class ConvolutionalEQNEC(nn.Module):
@@ -69,34 +69,45 @@ class ConvolutionalEQEQ(nn.Module):
         self.quanv0 = architecture_config['quanv0']
         self.quanv1 = architecture_config['quanv1']
         self.quantum_classifier = architecture_config['quantum_classifier']
-        self.pooling = architecture_config['pooling']
+        # TODO: THIS, POOLING WILL BE DONE INBETWEEN CONV LAYERS AND THERE WILL BE TWO POOLS
+        self.pooling_kernels_size = architecture_config['pooling_kernels_size']
+        self.pooling_strides = architecture_config['pooling_strides']
 
-    def forward(self, x):
+    def forward(self, x, name):
         # NOTE: Callum is using batch normalisation here which is not equivariant by default,
         # could use the escnn package to do that if needed
         x = nn.functional.relu(self.quanv0(x))
+        if self.pooling_kernels_size[0] != 0:
+            # collapse group dim into batch for pooling
+            x = x.view(-1, x.shape[2], x.shape[3], x.shape[4])
+            x = nn.AvgPool2d(
+                self.pooling_kernels_size[0], self.pooling_strides[0])(x)
+            # expand back with group dimension
+            x = x.view(-1, 4, x.shape[2], x.shape[3], x.shape[4])
         x = nn.functional.relu(self.quanv1(x))
+        # NOTE: is this pool needed?
         x = x.permute(1, 0, 2, 3, 4)
         # TODO: TEMP, REMOVE WHEN DONE
-        # fig, ax = plt.subplots(4,1)
-        # for filter_pose in range(4):
-        #    ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
-        # plt.savefig(name, dpi=300)
-        # print(x)
+        fig, ax = plt.subplots(4, 1)
+        for filter_pose in range(4):
+            ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
+        plt.savefig(name, dpi=300)
+        print(x)
         # average the group axis
         x = x.mean(1)
         # average the channels
         x = x.mean(1)
-        # fig1, ax1 = plt.subplots(1)
-        # ax1.imshow(x[0].detach().numpy())
-        # plt.savefig(name+'_averaged', dpi=300)
-        # print('just before pooling: ', x.shape)
-        if self.pooling:
+        fig1, ax1 = plt.subplots(1)
+        ax1.imshow(x[0].detach().numpy())
+        plt.savefig(name+'_averaged', dpi=300)
+        print('just before pooling: ', x.shape)
+        if self.pooling_kernels_size[1] != 0:
             # this hardcoded for 10x10->3x3
-            x = nn.AvgPool2d(4, 3)(x)
-        # fig1, ax2 = plt.subplots(1)
-        # ax2.imshow(x[0].detach().numpy())
-        # plt.savefig(name+'_pooled', dpi=300)
+            x = nn.AvgPool2d(
+                self.pooling_kernels_size[1], self.pooling_strides[1])(x)
+        fig1, ax2 = plt.subplots(1)
+        ax2.imshow(x[0].detach().numpy())
+        plt.savefig(name+'_pooled', dpi=300)
         # collapse the width and height
         x = x.flatten(1)
         x = self.quantum_classifier(x)
