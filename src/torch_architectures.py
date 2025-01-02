@@ -80,10 +80,12 @@ class ConvolutionalEQEQ(nn.Module):
         if self.pooling_kernels_size[0] != 0:
             # collapse group dim into batch for pooling
             x = x.view(-1, x.shape[2], x.shape[3], x.shape[4])
+            print('here', x.shape)
             x = nn.AvgPool2d(
                 self.pooling_kernels_size[0], self.pooling_strides[0])(x)
             # expand back with group dimension
-            x = x.view(-1, 4, x.shape[2], x.shape[3], x.shape[4])
+            x = x.view(4, -1, x.shape[1], x.shape[2], x.shape[3])
+            print('now here', x.shape)
         x = nn.functional.relu(self.quanv1(x))
         # NOTE: is this pool needed?
         x = x.permute(1, 0, 2, 3, 4)

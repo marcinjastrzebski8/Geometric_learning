@@ -10,7 +10,8 @@ from data.datasets import MicrobooneTrainData
 
 fake_json_config = {'image_size': 21,
                     'stride_quanv0': 1,
-                    'stride_quanv1': 2}
+                    'stride_quanv1': 2,
+                    'input_channel_side_len1':10}
 fake_config = {'n_layers': 1,
                'n_reuploads': 1,
                'n_filters0': 1,
@@ -28,7 +29,7 @@ architecture_config = {'quanv0': prep_equiv_quanv_model(fake_config, fake_json_c
                        'quanv1': prep_equiv_quanv_model(fake_config, fake_json_config, False),
                        'quantum_classifier': prep_equiv_quant_classifier(fake_config),
                        'pooling_kernels_size': [2, 3],
-                       'pooling_strides': [2, 2]}
+                       'pooling_strides': [2, 1]}
 
 model = ConvolutionalEQEQ(architecture_config)
 

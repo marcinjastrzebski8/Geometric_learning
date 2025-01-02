@@ -93,9 +93,7 @@ def prep_equiv_quanv_model(config, json_config, is_first_layer):
         stride = json_config['stride_quanv0']
 
     else:
-        # NOTE: ATM SIZE OF KERNEL HARDCODED (THROUGHOUT, NOT JUST THIS LINE)
-        input_channel_side_len = calculate_image_output_shape(
-            json_config['image_size'], 2, json_config['stride_quanv0'])
+        input_channel_side_len = json_config['input_channel_side_len1']
         quantum_circs = [
             patch_circuit for i in range(config['n_filters1'])]
         quantum_circs_properties = [
