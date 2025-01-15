@@ -75,7 +75,8 @@ def validate_ray_models(json_config,
                                    'quanv0': prep_equiv_quanv_model(best_config, json_config, True),
                                    'quanv1': prep_equiv_quanv_model(best_config, json_config, False),
                                    'quantum_classifier': prep_equiv_quant_classifier(best_config),
-                                   'pooling': True
+                                   'pooling_kernels_size': json_config['pooling_kernels_size'],
+                                   'pooling_strides': json_config['pooling_strides']
                                    }
             model = ConvolutionalEQEQ(architecture_config)
         else:
@@ -142,7 +143,7 @@ if __name__ == '__main__':
         load_config = json.load(f)
     if parse_args.test_dataset_name == 'Microboone':
         dataset_kwargs: dict | None = {
-            'size': parse_args.microboone_patch_size}
+            'patch_size': parse_args.microboone_patch_size}
     else:
         dataset_kwargs = None
     validate_ray_models(load_config, parse_args.n_models_to_keep,

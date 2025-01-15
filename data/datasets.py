@@ -137,7 +137,7 @@ class MicrobooneTrainData(Dataset):
         # add the channel dimension
         self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
         labels = torch.load(
-            path_to_datasets/f'microboone_from_callum/train_labels_{patch_size}x{patch_size}.pt')
+            path_to_datasets/f'microboone_from_callum/train_labels_{dataname_suffix}.pt')
         self.labels = torch.flatten(labels)
         self.shape = self.data.shape
 

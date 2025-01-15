@@ -230,8 +230,7 @@ def main(json_config):
             json_config['eqxx_n_filters1'])
         search_space['n_reuploads'] = tune.choice(
             json_config['eqxx_n_reuploads'])
-        search_space['param_init_max_vals'] = tune.choice(
-            [0.001, 0.1, np.pi/4, np.pi/2, 2*np.pi])
+        search_space['param_init_max_vals'] = tune.choice(json_config['param_init_max_vals'])
 
     elif architecture_codeword[:2] == 'EC':
         # TODO
@@ -243,11 +242,12 @@ def main(json_config):
         # hyperparams for the classical classification network - atm only shallow ffnn (2 layers) used
         search_space['dense_units'] = tune.choice(
             json_config['xxnec_dense_units'])
-        # dropout search space hardcoded - change if needed
-        search_space['use_dropout0'] = search_space['use_dropout1'] = tune.choice(
-            [True, False])
-        search_space['dropout0'] = search_space['dropout1'] = tune.uniform(
-            1e-4, 0.5)
+        #these partially hardcoded because not many options available
+        search_space['use_dropout0']  = tune.choice([True, False]) if json_config['use_dropout0'] == None else json_config['use_dropout0']
+        search_space['use_dropout1'] = tune.choice([True, False]) if json_config['use_dropout1'] == None else json_config['use_dropout1']
+        #these partially hardcoded because using the uniform function
+        search_space['dropout0'] = tune.uniform(1e-4, 0.5) if json_config['dropout0'] == None else json_config['dropout0']
+        search_space['dropout1'] = tune.uniform(1e-4, 0.5) if json_config['dropout1'] == None else json_config['dropout1']
     elif architecture_codeword[2:] == 'EQ':
         # hyperparams for quantum classification network
         # these used in defining equivariant gates which make up the ansatze
@@ -264,6 +264,7 @@ def main(json_config):
             'ring_fourth_neighbours_side'
         ]
         single_qubit_pauli = [RX, RY, RZ]
+        single_qubit_pauli_dict = {gate_str: single_qubit_pauli[i] for i, gate_str in enumerate(['RX','RY','RZ'])}
         two_qubit_pauli = [combo[0] + combo[1]
                            for combo in itertools.combinations_with_replacement(['X', 'Y', 'Z'], r=2)]
 
@@ -279,13 +280,15 @@ def main(json_config):
         all_2local_placement_combos = [combo for r in range(
             1, max_gates_per_block+1) for combo in itertools.combinations_with_replacement(gate_placement_2local, r=r)]
 
-        search_space['1local_gates'] = tune.choice(combos_for_1local_blocks)
-        search_space['2local_gates'] = tune.choice(combos_for_2local_blocks)
+        #these will either use all possible combinations or a choice from config
+        #1local gates are defined in a convoluted way because they're passed to the equivariant circuit maker as pennylane object instead of strings (mistake)
+        search_space['1local_gates'] = tune.choice(combos_for_1local_blocks) if json_config['xxeq_1local_gates'] == None else [single_qubit_pauli_dict[gate_str] for gate_str in json_config['xxeq_1local_gates']]
+        search_space['2local_gates'] = tune.choice(combos_for_2local_blocks) if json_config['xxeq_2local_gates'] == None else json_config['xxeq_2local_gates']
         search_space['1local_placements'] = tune.choice(
-            all_1local_placement_combos)
+            all_1local_placement_combos) if json_config['xxeq_1local_placements'] == None else json_config['xxeq_1local_placements']
         search_space['2local_placements'] = tune.choice(
-            all_2local_placement_combos)
-        # above hardcoded, these should be specified in json_config
+            all_2local_placement_combos) if json_config['xxeq_2local_placements'] == None else json_config['xxeq_2local_placements']
+        # these should be specified in json_config
         search_space['classifier_n_layers'] = tune.choice(
             json_config['xxeq_n_layers'])
         search_space['classifier_n_reuploads'] = tune.choice(
