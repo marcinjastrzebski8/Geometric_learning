@@ -72,42 +72,37 @@ class ConvolutionalEQEQ(nn.Module):
         self.pooling_kernels_size = architecture_config['pooling_kernels_size']
         self.pooling_strides = architecture_config['pooling_strides']
 
-    def forward(self, x):
+    def forward(self, x, name):
         # NOTE: Callum is using batch normalisation here which is not equivariant by default,
         # could use the escnn package to do that if needed
         x = nn.functional.relu(self.quanv0(x))
         if self.pooling_kernels_size[0] != 0:
             # collapse group dim into batch for pooling
             x = x.view(-1, x.shape[2], x.shape[3], x.shape[4])
-            # print('here', x.shape)
             x = nn.AvgPool2d(
                 self.pooling_kernels_size[0], self.pooling_strides[0])(x)
             # expand back with group dimension
             x = x.view(4, -1, x.shape[1], x.shape[2], x.shape[3])
-            # print('now here', x.shape)
         x = nn.functional.relu(self.quanv1(x))
-        # NOTE: is this pool needed?
         x = x.permute(1, 0, 2, 3, 4)
-        # TODO: TEMP, REMOVE WHEN DONE
-        # fig, ax = plt.subplots(4, 1)
-        # for filter_pose in range(4):
-        #    ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
-        # plt.savefig(name, dpi=300)
-        # print(x)
+        # TODO: TEMP FOR PLOTTING, REMOVE WHEN DONE
+        fig, ax = plt.subplots(4, 1)
+        for filter_pose in range(4):
+            ax[filter_pose].imshow(x[0][filter_pose][:][0][:].detach().numpy())
+        plt.savefig(name, dpi=300)
         # average the group axis
         x = x.mean(1)
         # average the channels
         x = x.mean(1)
-        # fig1, ax1 = plt.subplots(1)
-        # ax1.imshow(x[0].detach().numpy())
-        # plt.savefig(name+'_averaged', dpi=300)
-        # print('just before pooling: ', x.shape)
+        fig1, ax1 = plt.subplots(1)
+        ax1.imshow(x[0].detach().numpy())
+        plt.savefig(name+'_averaged', dpi=300)
         if self.pooling_kernels_size[1] != 0:
             x = nn.AvgPool2d(
                 self.pooling_kernels_size[1], self.pooling_strides[1])(x)
-        # fig1, ax2 = plt.subplots(1)
-        # ax2.imshow(x[0].detach().numpy())
-        # plt.savefig(name+'_pooled', dpi=300)
+        fig1, ax2 = plt.subplots(1)
+        ax2.imshow(x[0].detach().numpy())
+        plt.savefig(name+'_pooled', dpi=300)
         # collapse the width and height
         x = x.flatten(1)
         x = self.quantum_classifier(x)
