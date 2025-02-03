@@ -475,6 +475,132 @@ class RotatedMNISTTest(Dataset):
         return train_idx, val_idx
 
 
+class ParticleBombTrainData(Dataset):
+    """
+    Data produced by Leigh and processed by Callum.
+    Contains events with a single electron and single muon originating at the same point but emerging and various angles.
+
+    angle_bin (str): A range of angles between the muon and electron
+        options are: "0_5", "5_15", "15-180"
+    scaling (str): The scaling of input features to be used 
+        options are: "pi", "1", "no"
+    """
+
+    def __init__(self, angle_bin, scaling='pi'):
+        # NOTE: using only the dataset which contains 500 evenly distributed tracks and shower pixels
+        data = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/train/500/data.pt')
+        # add the channel dimension [TODO: CHECK IF NEEDED]
+        self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
+        labels = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/train/500/labels.pt')
+        self.labels = torch.flatten(labels)
+        self.shape = self.data.shape
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        label = self.labels[idx]
+
+        return sample, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
+class ParticleBombValData(Dataset):
+    """
+    Data produced by Leigh and processed by Callum.
+    Contains events with a single electron and single muon originating at the same point but emerging and various angles.
+
+    angle_bin (str): A range of angles between the muon and electron
+        options are: "0_5", "5_15", "15-180"
+    scaling (str): The scaling of input features to be used 
+        options are: "pi", "1", "no"
+    """
+
+    def __init__(self, angle_bin, scaling='pi'):
+        # NOTE: using only the dataset which contains 500 evenly distributed tracks and shower pixels
+        data = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/val/500/data.pt')
+        # add the channel dimension [TODO: CHECK IF NEEDED]
+        self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
+        labels = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/val/500/labels.pt')
+        self.labels = torch.flatten(labels)
+        self.shape = self.data.shape
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        label = self.labels[idx]
+
+        return sample, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
+class ParticleBombTestData(Dataset):
+    """
+    Data produced by Leigh and processed by Callum.
+    Contains events with a single electron and single muon originating at the same point but emerging and various angles.
+
+    angle_bin (str): A range of angles between the muon and electron
+        options are: "0_5", "5_15", "15-180"
+    scaling (str): The scaling of input features to be used 
+        options are: "pi", "1", "no"
+    """
+
+    def __init__(self, angle_bin, scaling='pi'):
+        # NOTE: using only the dataset which contains 500 evenly distributed tracks and shower pixels
+        data = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/test/data.pt')
+        # add the channel dimension [TODO: CHECK IF NEEDED]
+        self.data = data.view(data.shape[0], 1, data.shape[1], data.shape[2])
+        labels = torch.load(
+            path_to_datasets/f'particle_bomb/{angle_bin}/{scaling}_scaling/test/labels.pt')
+        self.labels = torch.flatten(labels)
+        self.shape = self.data.shape
+
+    def __len__(self):
+        return self.data.shape[0]
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        label = self.labels[idx]
+
+        return sample, label
+
+    def split(self, train_size, validation_size):
+        dataset_size = self.data.shape[0]
+        train_idx = np.random.choice(
+            range(dataset_size), train_size, replace=False)
+        remaining_idxs = np.array(
+            list(set(range(dataset_size)) - set(train_idx)), dtype=int)
+        val_idx = np.random.choice(
+            remaining_idxs, size=validation_size, replace=False)
+        return train_idx, val_idx
+
+
 dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
                   'MicrobooneValData': MicrobooneValData,
                   'MicrobooneTestData': MicrobooneTestData,
