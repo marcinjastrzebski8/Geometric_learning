@@ -218,7 +218,9 @@ def main(json_config):
     #   FOR NOW JUST IFS
 
     # common hyperparams
-    lr = tune.loguniform(0.001, 0.1)
+    #lr will sample from logspace generally (idk where to look) but from linspace when interval provided (i have some idea)
+    lr = tune.loguniform(0.001, 0.1) if json_config['lr'] is None else tune.uniform(*json_config['lr'])
+
     search_space = {'lr': lr}
 
     if architecture_codeword[:2] == 'EQ':
