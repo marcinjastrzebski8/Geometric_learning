@@ -606,4 +606,7 @@ dataset_lookup = {'MicrobooneTrainData': MicrobooneTrainData,
                   'MicrobooneTestData': MicrobooneTestData,
                   'RotatedMNISTTrainData': RotatedMNISTTrain,
                   'RotatedMNISTValData': RotatedMNISTVal,
-                  'RotatedMNISTTestData': RotatedMNISTTest}
+                  'RotatedMNISTTestData': RotatedMNISTTest,
+                  'ParticleBombTrainData': ParticleBombTrainData,
+                  'ParticleBombTestData': ParticleBombTestData,
+                  'ParticleBombValData': ParticleBombValData}
