@@ -196,14 +196,19 @@ def main(json_config):
 
         optimiser = optim.Adam(
             model.parameters(), lr=config['lr'])
-        if dataset_name != "Microboone":
-            train_dataset = dataset_lookup[train_dataset_name]()
-            val_dataset = dataset_lookup[val_dataset_name]()[:]
-        else:
+        if dataset_name == "Microboone":
             train_dataset = dataset_lookup[train_dataset_name](
                 json_config['image_size'], json_config['train_size'])
             val_dataset = dataset_lookup[val_dataset_name](
                 json_config['image_size'])[:]
+        elif dataset_name == "ParticleBomb":
+            train_dataset = dataset_lookup[train_dataset_name](
+                json_config['angle_bin'], json_config['scaling'])
+            val_dataset = dataset_lookup[val_dataset_name](
+                json_config['angle_bin'], json_config['scaling'])[:]
+        else:
+            train_dataset = dataset_lookup[train_dataset_name]()
+            val_dataset = dataset_lookup[val_dataset_name]()[:]
         train_model(model,
                     train_dataset,
                     criterion,
